@@ -1,0 +1,799 @@
+# automatically generated from XOTclIDE
+# script require component {IDECore IDEView IDEBaseGUI}
+@ Component IDEPersistenceAdd {
+description {GUI additionals for Version Control System as
+
+1. ChangesBrowser
+2. Repository Viewer (To View stuff directly from Database)}
+}
+package provide IDEPersistenceAdd 0.80
+package require IDEBaseGUI
+package require IDECore
+package require IDEView
+@ Class IDE::ChangesBrowser {
+description {This browser can show changes among components, classes and methods
+It use also IDE::TextDiffScaner to show changes of two textes.
+
+The mode of this browser is depended of class invoke method}
+}
+Class IDE::ChangesBrowser -superclass {::IDE::Browser ::IDE::GUICommands} -parameter {{mode components}}
+@ ::IDE::ChangesBrowser idemeta categories {init-compare initialize user-action private}
+@ ::IDE::ChangesBrowser idemeta categoriesMethods {{compareMethods compareObjects compareComponents} {setCompareLabels getSourcesWindows specificInit} {selectClass nextDifference selectMethod} getDiffFromArrays}
+@ ::IDE::ChangesBrowser idemeta component IDEPersistenceAdd
+IDE::ChangesBrowser instproc changeViewType vt {
+    my instvar vtype vclass mode methArr1 methArr2 obj1 obj2
+    set vtype $vt
+    if {$mode eq "components"} {
+        if {[::info exists vclass]} {
+            # if no diference is found vclass is unset
+            my selectClass $vclass
+        }
+    } elseif {$mode eq "objects"} {
+        catch {unset methArr1 methArr2}
+        $obj1 set${vtype}MethodsArray methArr1
+        $obj2 set${vtype}MethodsArray methArr2
+        set diffMethods [my getDiffFromArrays methArr1 methArr2]
+        [self]::methods setList $diffMethods
+    }
+}
+IDE::ChangesBrowser instproc compareComponents {c1 c2} {
+    my instvar comp1 comp2 compArr1 compArr2
+    set comp1 $c1
+    set comp2 $c2
+    $c1 setObjectsArray compArr1
+    $c2 setObjectsArray compArr2
+    [self]::classes setList [my getDiffFromArrays compArr1 compArr2]
+    my setCompareLabels "[$comp1 getName] [$comp1 set componentid]" "[$comp2 getName] [$comp2 set componentid]"
+}
+IDE::ChangesBrowser instproc compareMethods {m1 m2} {
+    # m1 and m1 are methods text
+    my instvar compare
+    my setTextLeft $m1
+    my setTextRight $m2
+    [self]::comparer scane
+    set compare 1
+    my nextDifference
+}
+IDE::ChangesBrowser instproc compareObjects {c1 c2} {
+    my instvar obj1 obj2 vclass
+    set obj1 $c1
+    set obj2 $c2
+    set name [$c1 getName]
+    my setCompareLabels "$name [$c1 set objectid]" "$name [$c2 set objectid]"
+    my changeViewType Instance
+}
+IDE::ChangesBrowser instproc destroy {} {
+    my instvar comp1 comp2 obj1 obj2 mode
+    if {$mode eq "components"} {
+        if {[info exists comp1]} {
+            if {[$comp1 istype IDE::ComponentEdition]} {$comp1 destroy}
+            if {[$comp2 istype IDE::ComponentEdition]} {$comp2 destroy}
+        }
+    } else {
+        if {[info exists obj1] && [$obj1 istype IDE::ObjectEdition]} {$obj1 destroy}
+        if {[info exists obj1] && [$obj2 istype IDE::ObjectEdition]} {$obj2 destroy}
+    }
+    next
+}
+IDE::ChangesBrowser instproc fillMenuStruct aMenuStruct {
+    $aMenuStruct enablementHandler [self]
+    $aMenuStruct addCommand {Produce Changes Script} [list [self] produceChangesScript]
+}
+IDE::ChangesBrowser instproc getChangesScript {comp1 comp2} {
+    set ret "#changes for component [$comp1 getName]\n# !!! Warning\n# The result are not full reliable\n#the moved classes and changes in class definition are not computed exactly\n"
+    $comp1 setObjectsArray compArr1
+    $comp2 setObjectsArray compArr2
+    set classdiffs [my getDiffFromArrays compArr1 compArr2]
+    foreach class $classdiffs {
+        if {![info exists compArr1($class)]} {
+            append ret "# Class $class was removed or moved\n"
+            append ret "# $class destroy\n"
+            continue
+        }
+        set obj1 [$comp1 getObject $class]
+        set obj2 [$comp2 getObject $class]
+        if {![info exists compArr2($class)]} {
+            append ret "# Class $class was created or moved\n"
+            append ret "if {\[Object isobject $class\]} { IDE::Dialog message \"check class $class. probably moved to [$comp1 getName]\"} else \{\n"
+            append ret "[$obj1 getDefBody]\n"
+            append ret "[$obj1 getName] moveToComponent [$comp1 getName]\n"
+            foreach vtype {Class Instance} {
+                catch {unset methArr1}
+                $obj1 set${vtype}MethodsArray methArr1
+                if {![array exists methArr1]} continue
+                foreach method [array names methArr1] {
+                    append ret [$obj1 get${vtype}MethodBody $method] \n
+                }
+            }
+            append ret "\}\n"
+            catch {unset methArr1}
+            continue
+        }
+        append ret [my getChangesScriptForObjects [$comp1 getName] $class $obj1 $obj2]
+    }
+    return $ret
+}
+IDE::ChangesBrowser instproc getChangesScriptForObjects {compName class obj1 obj2} {
+   set ret "#changes for class $class\n"
+   if {[$obj1 istype IDE::ObjectEdition]} {
+       set type [$obj1 type]
+   } else {
+       if {[$obj1 istype IDE::ProcsGroup]} {
+           set type ProcsGroup
+       } else {
+           set type Class
+       }
+   }
+   foreach vtype {Class Instance} {
+       $obj1 set${vtype}MethodsArray methArr1
+       $obj2 set${vtype}MethodsArray methArr2
+       set diffMethods [my getDiffFromArrays methArr1 methArr2]
+       foreach method $diffMethods {
+           if {![info exists methArr1($method)]} {
+               append ret "# delete method\n"
+               if {$type eq "ProcsGroup"} {
+                   append ret "set comp \[IDE::Component getCompObjectForName $compName\]\n"
+                   append ret "set pg \[\$comp getProcsGroupWithName $class\]\n"
+                   append ret "\$pg deleteMethod $method\n"
+               } else {
+                   if {$vtype eq "Class"} {
+                       append ret "$class proc $method {} {}\n"
+                   } elseif {$vtype eq "Instance"} {
+                       append ret "$class instproc $method {} {}\n"
+                   }
+               }
+           } else {
+               if {![info exists methArr1($method)]} {
+                   append ret "# add method\n"
+               } else {
+                   append ret "# modify method\n"
+               }
+               if {$type eq "ProcsGroup"} {
+                   append ret "set comp \[IDE::Component getCompObjectForName $compName\]\n"
+                   append ret "set pg \[\$comp getProcsGroupWithName $class\]\n"
+                   append ret "\$pg handleScript [list [$obj1 get${vtype}MethodBody $method]]\n"
+               } else {
+                   append ret [$obj1 get${vtype}MethodBody $method] \n
+               }
+           }
+       }
+       catch {unset methArr1 methArr2}
+   }
+   return $ret
+}
+IDE::ChangesBrowser instproc getDiffFromArrays {a1_ref a2_ref} {
+    upvar $a1_ref a1
+    upvar $a2_ref a2
+    set diff [list]
+    if {[info exists a1]} {
+        for {set sid [array startsearch a1]} {[array anymore a1 $sid]} {} {
+            set obj [array nextelement a1 $sid]
+            if {![info exists a2($obj)] || $a1($obj)!=$a2($obj)} {
+                lappend diff $obj
+            }
+        }
+        array donesearch a1 $sid
+    }
+    if {[info exists a2]} {
+        for {set sid [array startsearch a2]} {[array anymore a2 $sid]} {} {
+            set obj [array nextelement a2 $sid]
+            if {![info exists a1($obj)]} {
+                lappend diff $obj
+            }
+        }
+        array donesearch a2 $sid
+    }
+    return $diff
+}
+IDE::ChangesBrowser instproc getMenuStruct {} {
+    IDE::MenuStruct create [self]::ms Changes 0
+}
+IDE::ChangesBrowser instproc getSourcesWindows fwin {
+    my instvar mode
+    if {$mode eq "components"} {
+        IDE::NListView create [self]::classes $fwin.classes -notify [self] -notifyProc selectClass
+        IDE::NListView create [self]::methods $fwin.methods -notify [self] -notifyProc selectMethod
+        return [list $fwin.classes $fwin.methods]
+    } elseif {$mode eq "objects"} {
+        IDE::NListView create [self]::methods $fwin.methods -notify [self] -notifyProc selectMethod
+        return $fwin.methods
+    } elseif {$mode eq "methods"} {
+        return
+    }
+    error "wrong mode"
+}
+IDE::ChangesBrowser instproc getTitle {} {
+    return {Changes Browser}
+}
+IDE::ChangesBrowser instproc nextDifference {} {
+    my instvar compare
+    if {$compare} {
+        [self]::comparer markNextDiff 
+    }
+}
+IDE::ChangesBrowser instproc produceChangesScript {} {
+    if {[my mode] ne "components"} {
+        IDE::Dialog infoMessage "Works only for components changes mode"
+        return
+    }
+    my instvar comp1 comp2 
+    IDE::System handleResult [my getChangesScript $comp1 $comp2]
+}
+IDE::ChangesBrowser instproc produceChangesScriptFor comps {
+    foreach comp $comps {
+        set cobj [IDE::Component getCompObjectForNameIfExist $comp]
+        if {$cobj eq ""} continue
+        if {![$cobj isPersistent]} continue
+        if {[$cobj isclosed]} {
+            append ret "#comp $comp is versioned\n"
+            continue
+        }
+        if {[$cobj set basedon] eq "" || [$cobj set basedon]==0} {
+            append ret "#comp $comp no previous version\n"
+            continue
+        }
+        set comp2 [IDE::ComponentEdition new [$cobj set basedon]]
+        append ret [my getChangesScript $cobj $comp2]
+    }
+    IDE::System handleResult $ret
+}
+IDE::ChangesBrowser instproc produceChangesScriptForIDE {} {
+    my produceChangesScriptFor [concat [IDE::System getCoreComponentsAll] [IDE::System getExtraComponents]]
+}
+IDE::ChangesBrowser instproc produceChangesScriptForXdobry {} {
+    set comps [list]
+    set coreComps [IDE::System getCoreComponentsAll]
+    foreach c [IDE::Component getComponentNames] {
+        if {[lsearch $coreComps $c]>=0} continue
+        if {[string match xdobry::* $c]} {
+            lappend comps $c
+        }
+    }
+    my produceChangesScriptFor $comps
+}
+IDE::ChangesBrowser instproc selectClass class {
+    my instvar comp1 comp2 compArr1 compArr2 vtype methArr1 methArr2 vclass
+    set vclass $class
+    catch {unset methArr1 methArr2}
+    if {[info exists compArr1($class)]} {
+        [$comp1 getObject $class] set${vtype}MethodsArray methArr1
+    }
+    if {[info exists compArr2($class)]} {
+        [$comp2 getObject $class] set${vtype}MethodsArray methArr2
+    }
+    set diffMethods [my getDiffFromArrays methArr1 methArr2]
+    [self]::methods setList $diffMethods
+}
+IDE::ChangesBrowser instproc selectMethod method {
+    my instvar comp1 comp2 compArr1 compArr2 vtype methArr1 methArr2 vclass compare obj1 obj2 mode
+    set lleft {}; set lright {}
+    set s 0
+    if {$mode eq "components" && ![info exists compArr1($vclass)]} {
+        my setTextLeft "no class $vclass"
+    } else {
+        if {![info exists methArr1($method)]} {
+            my setTextLeft "no $vtype method $method"
+        } else {
+            incr s
+            if {$mode eq "components"} {
+                set obj [$comp1 getObject $vclass]
+            } else {
+                set obj $obj1
+            }
+            my setTextLeft [$obj get${vtype}MethodBody $method]
+            set lleft "$method $methArr1($method)"
+        }   
+    }
+    if {$mode eq "components" && ![info exists compArr2($vclass)]} {
+        my setTextRight "no class $vclass"
+    } else {
+        if {![info exists methArr2($method)]} {
+            my setTextRight "no $vtype method $method"
+        } else {
+            incr s
+            if {$mode eq "components"} {
+                set obj [$comp2 getObject $vclass]
+            } else {
+                set obj $obj2
+            }
+            my setTextRight [$obj get${vtype}MethodBody $method]
+            set lright "$method $methArr2($method)"
+        }
+    }
+    my setMethodLabels $lleft $lright
+    if {$s==2} {
+        [self]::comparer scane
+        set compare 1
+        my nextDifference
+    } else {
+        set compare 0
+    }
+}
+IDE::ChangesBrowser instproc setCompareLabels {lab1 lab2} {
+    my instvar win
+    $win.titleleft configure -text $lab1
+    $win.titleright configure -text $lab2
+   
+}
+IDE::ChangesBrowser instproc setMethodLabels {lab1 lab2} {
+    my instvar win
+    $win.labelleft configure -text $lab1
+    $win.labelright configure -text $lab2
+   
+}
+IDE::ChangesBrowser instproc setTextLeft text {
+    [self]::bodyleft setText $text
+}
+IDE::ChangesBrowser instproc setTextRight text {
+    [self]::bodyright setText $text
+}
+IDE::ChangesBrowser instproc specificInit {} {
+    my instvar win mode vtype compare
+    set vtype Instance
+    set compare 0
+
+    frame $win.buttons -relief raised -border 3
+    frame $win.lframe 
+    frame $win.fname
+    frame $win.fpar
+
+    label $win.titleleft
+    label $win.titleright
+    button $win.next -text "Next Difference" -command [list [self] nextDifference]
+    IDE::Text [self]::bodyleft $win.bodyleft -width 38 -height 15
+    IDE::Text [self]::bodyright $win.bodyright -width 38 -height 15
+    [[self]::bodyleft getTextWindow] configure -wrap none
+    [[self]::bodyright getTextWindow] configure -wrap none
+    label $win.labelleft
+    label $win.labelright
+
+    grid $win.titleleft -row 0 -column 0 -sticky w
+    grid $win.titleright -row 0 -column 1 -sticky w
+    set swins [my getSourcesWindows $win] 
+    if {[llength $swins]==1} {
+        grid $swins -row 1 -column 0 -columnspan 2 -sticky news
+    } elseif {[llength $swins]==2} {
+        grid [lindex $swins 0] -row 1 -column 0 -sticky news
+        grid [lindex $swins 1] -row 1 -column 1 -sticky news
+    } else {
+        frame $win.sources
+        grid $win.sources -row 1 -column 0 -columnspan 2 -sticky news
+        set i 0
+        foreach w $swins {
+            grid $w -in $win.sources -row 0 -column $i -sticky news
+            grid columnconfigure $win.sources $i -weight 1
+            incr i
+            raise $w $win.sources
+        }
+        grid rowconfigure $win.sources 0 -weight 1
+    }
+    if {$mode eq "components" || $mode eq "objects"} {
+        IDE::StateButton [self]::cbutton $win.cbutton  -states {Instance Class} -command [list [self] changeViewType]
+        grid $win.cbutton -row 3 -column 1 -sticky w
+    }
+    grid $win.labelleft -row 2 -column 0 -sticky w
+    grid $win.labelright -row 2 -column 1 -sticky w
+    grid $win.next -row 3 -column 0 -sticky w
+    grid $win.bodyleft -row 4 -column 0 -sticky news
+    grid $win.bodyright -row 4 -column 1 -sticky news
+
+    grid columnconfigure $win 0 -weight 1
+    grid columnconfigure $win 1 -weight 1
+    grid rowconfigure $win 4 -weight 1
+    IDE::TextDiffScaner [self]::comparer -textWin1 [[self]::bodyleft getTextWindow] -textWin2 [[self]::bodyright getTextWindow]
+    next
+}
+IDE::ChangesBrowser proc compareComponents {comp1 comp2} {
+    set obj [my create [Object autoname browser] [Object autoname .browser] -mode components]
+    $obj compareComponents $comp1 $comp2
+    return $obj
+}
+IDE::ChangesBrowser proc compareMethods {meth1 meth2} {
+    set obj [my create [Object autoname browser] [Object autoname .browser] -mode methods]
+    $obj compareMethods $meth1 $meth2
+    return $obj
+}
+IDE::ChangesBrowser proc compareObjects {obj1 obj2} {
+    set obj [my create [Object autoname browser] [Object autoname .browser] -mode objects]
+    $obj compareObjects $obj1 $obj2
+    return $obj
+}
+IDE::ChangesBrowser proc newBrowser {} {
+    return [my new [Object autoname .cbrowser]]
+}
+IDE::ChangesBrowser proc unknown args {
+    error "unknown method on [self] $args"
+}
+@ Class IDE::ComponentEdition {
+description {This is a simpe functionless wrapper for db-persistence component.
+It is used to show contents of one component.
+The objects and methods bodies are build as intern array list and not
+really objects.
+It has tha same interface that IDE::Component for viewing. That means
+the viewer can use it both (polymorphismus).
+}
+}
+Class IDE::ComponentEdition
+@ ::IDE::ComponentEdition idemeta component IDEPersistenceAdd
+IDE::ComponentEdition instproc getName {} {
+    my instvar name
+    return $name
+}
+IDE::ComponentEdition instproc getObject name {
+    my instvar objectArr
+    if {[info exists objectArr($name)]} {
+        return $objectArr($name)
+    } else {
+        return {}
+    }
+}
+IDE::ComponentEdition instproc getObjectNames {} {
+    set ret [list]
+    foreach obj [my info children] {
+        if {[$obj istype IDE::ObjectEdition]} {
+            lappend ret [$obj getName]
+        }
+    }
+    return $ret
+}
+IDE::ComponentEdition instproc init compid {
+    my instvar componentid objectArr name
+    set componentid $compid
+    set name [lindex [[IDE::DBPersistence getPersistenceManager] selectExact Component name componentid $compid] 0]
+
+    set rows [[IDE::DBPersistence getPersistenceManager] selectSubobjectsBase IDE::ComponentPersistence::descriptor $componentid objectid {name type}]
+    foreach row $rows {
+        set objectid [lindex $row 0]
+        set oname [lindex $row 1]
+        set otype [lindex $row 2]
+        set objectArr($oname) [IDE::ObjectEdition new -childof [self] $oname $objectid -type $otype]
+    }
+}
+IDE::ComponentEdition instproc printString {} {
+    my instvar name componentid
+    return "[self class] $name $componentid"
+}
+@ IDE::ComponentEdition instproc setObjectsArray {} {
+description {This method are also impelented by IDE::ComponentPersistence
+It is used to fill in informations about classes and objects}
+}
+IDE::ComponentEdition instproc setObjectsArray arr_ref {
+    upvar $arr_ref arr
+    foreach obj [my info children] {
+        if {[$obj istype IDE::ObjectEdition]} {
+            set arr([$obj getName]) [$obj set objectid]
+        }
+    }
+}
+Class IDE::EditionBrowser -superclass ::IDE::Browser -parameter {{mode component}}
+@ ::IDE::EditionBrowser idemeta categories private
+@ ::IDE::EditionBrowser idemeta categoriesMethods changeViewType
+@ ::IDE::EditionBrowser idemeta component IDEPersistenceAdd
+IDE::EditionBrowser instproc changeViewType state {
+    my instvar vtype methodInstanceArray methodClassArray
+    set vtype $state
+    [self]::methods setList [array names method${vtype}Array]
+}
+IDE::EditionBrowser instproc destroy {} {
+    my instvar component object mode
+    if {$mode eq "component"} {
+        $component destroy
+    } else {
+        $object destroy
+    }
+    next
+}
+IDE::EditionBrowser instproc selectClass class {
+    my instvar component
+    my viewObject [$component getObject $class]
+}
+IDE::EditionBrowser instproc selectMethod method {
+    my instvar object vtype
+    [self]::methodedit setText [$object get${vtype}MethodBody $method] 
+}
+IDE::EditionBrowser instproc specificInit {} {
+    my instvar win mode vtype
+    set vtype Instance
+
+    panedwindow $win.rigtharea -orient vertical
+    if {$mode eq "component"} {
+        panedwindow $win.upperarea -orient horizontal
+    }
+    frame $win.mframe
+
+    IDE::Editor [self]::methodedit $win.methodedit
+    IDE::NListView create [self]::methods $win.methods -notify [self] -notifyProc selectMethod
+    IDE::StateButton [self]::cbutton $win.cbutton  -states {Instance Class} -command [list [self] changeViewType]
+    pack $win.methods -in $win.mframe -expand yes -fill both
+    pack $win.cbutton -in $win.mframe -anchor w
+
+    if {$mode eq "component"} {
+        IDE::NListView create [self]::classes $win.classes -notify [self] -notifyProc selectClass
+        $win.upperarea add $win.classes $win.mframe
+        set upperwin $win.upperarea
+    } else {
+        set upperwin $win.mframe
+    }
+
+    $win.rigtharea add $upperwin $win.methodedit
+
+    pack  $win.rigtharea -fill both -expand yes
+
+    next
+}
+IDE::EditionBrowser instproc viewComponent compEdition {
+    my instvar component objectsArr
+    set component $compEdition
+    my setTitleAddition " Component [$component getName] [$component set componentid]"
+    
+    [self]::classes setList [$component getObjectNames]
+}
+IDE::EditionBrowser instproc viewObject objectEdition {
+    my instvar object methodInstanceArray methodClassArray
+    set object $objectEdition
+    catch {unset methodInstanceArray methodClassArray}
+    $object setInstanceMethodsArray methodInstanceArray
+    $object setClassMethodsArray methodClassArray
+    [self]::cbutton setState Instance
+    my changeViewType Instance
+    my setTitleAddition " Object [$object getName] [$object set objectid]"
+}
+IDE::EditionBrowser proc browseComponentEdition compEdition {
+    set obj [my create [Object autoname ebrowser] [Object autoname .ebrowser] -mode component]
+    $obj viewComponent $compEdition
+    return $obj
+}
+IDE::EditionBrowser proc browseComponentId compId {
+    set edition [IDE::ComponentEdition new $compId]
+    my browseComponentEdition $edition
+}
+IDE::EditionBrowser proc browseObjectEdition objectEdition {
+    set obj [my create [Object autoname ebrowser] [Object autoname .ebrowser] -mode object]
+    $obj viewObject $objectEdition
+    return $obj
+}
+IDE::EditionBrowser proc unknown args {
+    error "unknown method on [self] $args"
+}
+Class IDE::ObjectEdition -parameter type
+@ ::IDE::ObjectEdition idemeta component IDEPersistenceAdd
+IDE::ObjectEdition instproc getClassMethodBody method {
+    my instvar cashClassBody
+    return $cashClassBody($method)
+}
+IDE::ObjectEdition instproc getDefBody {} {
+    my instvar bodyCache objectid
+    if {[info exists bodyCache] && $bodyCache ne ""} {
+        return $bodyCache
+    }
+    set bodyCache [lindex [[IDE::DBPersistence getPersistenceManager] selectExact Object defbody objectid $objectid] 0]
+    return $bodyCache
+}
+IDE::ObjectEdition instproc getInstanceMethodBody method {
+    my instvar cashInstanceBody
+    return $cashInstanceBody($method)
+}
+IDE::ObjectEdition instproc getName {} {
+    my instvar name
+    return $name
+}
+IDE::ObjectEdition instproc init {tname objid} {
+    my instvar objectid name
+    set name $tname
+    set objectid $objid
+}
+IDE::ObjectEdition instproc initMethodsArrays {} {
+    my instvar isActual cashInstance cashClass objectid cashInstanceBody cashClassBody
+    if {[info exists isActual]} return
+    set cashInstance {}
+    set cashClass {}
+    set rows [[IDE::DBPersistence getPersistenceManager] selectSubobjectsBase IDE::ObjectDescription::descriptor $objectid methodid {name type body}]
+    foreach row $rows {
+        set methodid [lindex $row 0]
+        set name [lindex $row 1]
+        set type [lindex $row 2]
+        set body [lindex $row 3]
+        if {$type eq "tclproc"} {set type Instance}
+        lappend cash${type} $name $methodid
+        set cash${type}Body($name) $body
+    }
+    set isActual 1
+}
+IDE::ObjectEdition instproc printString {} {
+    my instvar name objectid
+    return "[self class] $name $objectid"
+}
+IDE::ObjectEdition instproc setClassMethodsArray arr_ref {
+    my instvar cashClass
+    my initMethodsArrays
+    upvar $arr_ref arr
+    array set arr $cashClass
+}
+IDE::ObjectEdition instproc setInstanceMethodsArray arr_ref {
+    my instvar cashInstance
+    my initMethodsArrays
+    upvar $arr_ref arr
+    array set arr $cashInstance
+}
+@ Class IDE::TextDiffScaner {
+description {This class can compare to text pieces and recognize changes.
+It do the same job as diff unix command}
+}
+Class IDE::TextDiffScaner -parameter {textWin1 textWin2}
+@ ::IDE::TextDiffScaner idemeta component IDEPersistenceAdd
+IDE::TextDiffScaner instproc beginOfEqual start {
+    my instvar textLen1 textLen2
+    # start is last equal lines index
+    set s1 [expr {[lindex $start 0]+1}]
+    set s2 [expr {[lindex $start 1]+1}]
+    set r 1
+    while {$s1+$r<=$textLen1 || $s2+$r<=$textLen2} {
+        if {$s1+$r<$textLen1} {
+            set line1 [my getLine1 [expr $s1+$r]]
+            for {set x2 $s2} {$x2<$textLen2 && $x2-$s2<=$r} {incr x2} {
+                set line2 [my getLine2 $x2]
+                if {$line1==$line2} {return [list [expr $s1+$r] $x2]}
+            }
+        }
+        if {$s2+$r<$textLen2} {
+            set line2 [my getLine2 [expr $s2+$r]]
+            for {set x1 $s1} {$x1<$textLen1 && $x1-$s1<=$r} {incr x1} {
+                set line1 [my getLine1 $x1]
+                if {$line1==$line2} {return [list $x1 [expr $s2+$r]]}
+            }
+        }
+
+        incr r
+    }
+    return {}
+}
+IDE::TextDiffScaner instproc endOfEqual start {
+    my instvar textWin1 textLen1 textWin2 textLen2 diffAtEnd
+    set l1 [lindex $start 0]
+    set l2 [lindex $start 1]
+    set ret {}
+    while {$l1<$textLen1 && $l2<$textLen2} {
+        set line1 [my getLine1 $l1]
+        set line2 [my getLine2 $l2]
+        if {$line1!=$line2} {
+            break
+        }
+        set ret [list $l1 $l2]
+        incr l1
+        incr l2
+    }
+    if {$l1==$textLen1 || $l2==$textLen2} {
+        set diffAtEnd 0
+    }
+    #[self] halt
+    return $ret
+}
+IDE::TextDiffScaner instproc getLine1 line {
+    my instvar textWin1
+    return [$textWin1 get $line.0 [list $line.0 lineend]]
+}
+IDE::TextDiffScaner instproc getLine2 line {
+    my instvar textWin2
+    return [$textWin2 get $line.0 [list $line.0 lineend]]
+}
+IDE::TextDiffScaner instproc init {} {
+    my instvar textWin1 textWin2
+    $textWin1 tag configure hlight -background yellow
+    $textWin2 tag configure hlight -background yellow
+}
+IDE::TextDiffScaner instproc initLength {} {
+    my instvar textWin1 textLen1 textWin2 textLen2
+    set textLen1 [expr {[lindex [split [$textWin1 index end] .] 0]-1}]
+    set textLen2 [expr {[lindex [split [$textWin2 index end] .] 0]-1}]
+}
+IDE::TextDiffScaner instproc markNextDiff {} {
+    my instvar textLen1 textLen2 textWin1 textWin2 currDiff equalIndex diffAtStart diffAtEnd
+    if {[llength $equalIndex]==0} return
+    if {$currDiff==0 && $diffAtStart} {
+        set end [lindex $equalIndex 0]
+        set b1 0
+        set b2 0
+        set e1 [expr {[lindex [lindex $end 0] 0]-1}]
+        set e2 [expr {[lindex [lindex $end 0] 1]-1}]
+    } else {
+        set begin [lindex $equalIndex $currDiff]
+        if {[llength $equalIndex]>$currDiff+1} {
+            set end [lindex $equalIndex [expr $currDiff+1]]
+            set b1 [expr {[lindex [lindex $begin 1] 0]+1}]
+            set b2 [expr {[lindex [lindex $begin 1] 1]+1}]
+            set e1 [expr {[lindex [lindex $end 0] 0]-1}]
+            set e2 [expr {[lindex [lindex $end 0] 1]-1}]
+        } elseif {$diffAtEnd} {
+            set b1 [expr {[lindex [lindex $begin 1] 0]+1}]
+            set b2 [expr {[lindex [lindex $begin 1] 1]+1}]
+            set e1 $textLen1
+            set e2 $textLen2
+        } else { 
+            # exactly the same
+            return
+        }
+    }
+    # remove taged
+    $textWin1 tag remove hlight 1.0 end
+    $textWin2 tag remove hlight 1.0 end
+    if {$b1<=$e1} {
+        $textWin1 tag add hlight $b1.0 [list $e1.0 lineend]
+    }
+    if {$b2<=$e2} {
+        $textWin2 tag add hlight $b2.0 [list $e2.0 lineend]
+    }
+    $textWin1 see $b1.0
+    $textWin2 see $b2.0
+    if {[incr currDiff]>[llength $equalIndex]+$diffAtStart+$diffAtEnd-2} { set currDiff 0}
+}
+IDE::TextDiffScaner instproc scane {} {
+    my instvar currDiff equalIndex diffAtStart diffAtEnd
+    my initLength
+    # the ideas of this algorithmus is to find equal areas
+    # it is not the best one . see gnu diff algorithmus for very good one
+    set start [list 0 0]
+    set currDiff 0
+    set end [list 0 0]
+    set equalIndex {}
+    set pos $start
+    set diffAtStart 0
+    set diffAtEnd 1
+    while {$end ne "" && $pos ne ""} {
+        set end [my endOfEqual $pos]
+        if {$end ne ""} {
+            if {$end!=[list 0 0]} {
+                lappend equalIndex [list $pos $end]
+            }
+            set pos [my beginOfEqual $end]
+        } elseif {$pos==[list 0 0]} {
+            set pos [my beginOfEqual $pos]
+            set end [list 0 0]
+            set diffAtStart 1
+        }
+    }
+}
+@ Class IDE::VersionTreeView {
+description {This should show the heritage of versions and edititions.
+}
+}
+Class IDE::VersionTreeView -superclass ::IDE::ResultBrowser
+@ ::IDE::VersionTreeView idemeta component IDEPersistenceAdd
+IDE::VersionTreeView proc computeVersionTreeText comps {
+    foreach comp $comps {
+        set id [lindex $comp 1]
+        set basedon [lindex $comp 0]
+        if {$basedon ne "" && $basedon!=0 && [info exists deep($basedon)]} {
+            set deep($id) [expr $deep($basedon)+1]
+        } else {
+            set deep($id) 0
+        }
+    }
+    set result {}
+    foreach comp $comps {
+        set id [lindex $comp 1]
+        append result "[string repeat { } $deep($id)][join [lrange $comp 1 end] -]\n"
+    }
+    return $result
+}
+IDE::VersionTreeView proc newBrowser result {
+    return [my new [Object autoname .result] -result $result]
+}
+IDE::VersionTreeView proc showVersionTreeComponent name {
+    set comps [[IDE::DBPersistence getPersistenceManager] getVersionsForName $name {basedon componentid timest versioninfo username} ::IDE::ComponentPersistence::descriptor 0]
+    my newBrowser [my computeVersionTreeText $comps]
+}
+IDE::VersionTreeView proc showVersionTreeMethod {name object type} {
+    set methods [[IDE::DBPersistence getPersistenceManager] getMethodVersionsForNameAndClassForTree $name $object $type]
+    my newBrowser [my computeVersionTreeText $methods]
+}
+IDE::VersionTreeView proc showVersionTreeObject name {
+    set objects [[IDE::DBPersistence getPersistenceManager] getVersionsForName $name {basedon objectid timest versioninfo isclosed username} IDE::ObjectDescription::descriptor 0]
+    my newBrowser [my computeVersionTreeText $objects]
+}
+Object IDE::VersionControlQueries
+@ ::IDE::VersionControlQueries idemeta component IDEPersistenceAdd
+IDE::VersionControlQueries proc todayChangedMethods {} {
+  set query {SELECT c.name,o.name,m.type,m.name from Component c, ComponentObject co, Object o, ObjectMethod om, Method m where c.componentid=co.componentid and co.objectid=o.objectid and o.objectid=om.objectid and om.methodid=m.methodid and to_days(m.timest)=to_days(now())}
+  IDE::DBPersistence queryAsReport $query
+}
+

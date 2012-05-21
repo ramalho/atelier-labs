@@ -1,0 +1,645 @@
+# automatically generated from XOTclIDE
+@ Component xdobry::sql {
+description {XOSql base component
+
+currently supported base interfaces: mysqltcl, postgres, odbctcl and dbitotcl.
+
+Base Usage Example
+1) Connecting mysql
+set obj [Sqlinterface loadInterface mysqltcl]
+$obj connect {user root dbank mydb}
+puts [$obj queryList {select * from mytab}]
+
+2) Connection per tk dialog
+set obj [IDEDBConnectDialog setConnectionOn]
+
+See documentation of all methods and classes to get all informations
+
+hompage: http://www.xdobry.de/xosql
+
+XOSql is GPL Software 
+and comes with ABSOLUTELY NO WARRANTY 
+See the GNU General Public License for more details.
+
+See file LICENSE for more details 
+}
+}
+package provide xdobry::sql 0.78
+@ Class IDEDBConnectDialog {
+description {Dialog frame for connection dialog}
+}
+Class IDEDBConnectDialog -parameter {{type okcancel} {interface {}} {connectArgs {}} connectionObject withSchemaExt {writefile 0}}
+@ ::IDEDBConnectDialog idemeta categoriesMethodsProcs {tkMessage setConnectionOn}
+@ ::IDEDBConnectDialog idemeta categoriesProcs {private api}
+@ ::IDEDBConnectDialog idemeta component xdobry::sql
+IDEDBConnectDialog instproc actionCancel {} {
+    my instvar userAction
+    set userAction cancel
+    my signalFree
+}
+IDEDBConnectDialog instproc actionOk {} {
+    my instvar userAction
+    set userAction ok
+    my signalFree
+}
+IDEDBConnectDialog instproc buildMainWindow {} {
+    my instvar win frame
+
+    set win .dialog
+    catch {destroy $win}
+    toplevel $win -class Dialog
+    wm withdraw $win
+    wm title $win "Connect to Database"
+    wm iconname $win Dialog
+    wm protocol $win WM_DELETE_WINDOW [list [self] actionCancel]
+    
+    set frame [frame $win.frame]
+    frame $win.buttons -relief raised
+
+    pack $frame -fill both -expand yes
+
+    button $win.buttons.ok -text Ok -command [list [self] actionOk]
+    button $win.buttons.cancel -text Cancel -command [list [self] actionCancel]
+    pack $win.buttons.ok $win.buttons.cancel -side left  -padx 10 -pady 5
+
+    pack $win.buttons -side bottom -fill both
+
+    # 6. Withdraw the window, then update all the geometry information
+    # so we know how big it wants to be, then center the window in the
+    # display and de-iconify it.
+
+    update idletasks
+    set x [expr [winfo screenwidth $win]/2 - [winfo reqwidth $win]/2  - [winfo vrootx [winfo parent $win]]]
+    set y [expr [winfo screenheight $win]/2 - [winfo reqheight $win]/2  - [winfo vrooty [winfo parent $win]]]
+    wm geom $win +$x+$y
+
+}
+IDEDBConnectDialog instproc cleanUpAfterSignal {} {
+    my instvar oldFocus oldGrab win grabStatus
+    catch {focus $oldFocus}
+    catch {
+        # It's possible that the window has already been destroyed,
+        # hence this "catch".  Delete the Destroy handler so that
+        # tkPriv(button) doesn't get reset by it.
+
+        bind $win <Destroy> {}
+        destroy $win
+    }
+    if {$oldGrab != ""} {
+        if {$grabStatus == "global"} {
+            ::grab -global $oldGrab
+        } else {
+            ::grab $oldGrab
+        }
+    }
+}
+IDEDBConnectDialog instproc destroy {} {
+   ::destroy [my set win]
+   next
+}
+IDEDBConnectDialog instproc getConnectionArguments {} {
+    my instvar connectionObject win frame connectArgs writefile
+    set cframe [IDEDBConnectFrame new -childof [self] -connectionObject $connectionObject -win $frame.con -connectArgs $connectArgs -writefile $writefile]
+    pack $frame.con
+    my suspendUntilSignal
+    my connectArgs [$cframe getConnectArgs]
+}
+IDEDBConnectDialog instproc getInterface {} {
+    my instvar interface connectionObject userAction frame withSchemaExt
+    if {[info exists connectionObject] && $connectionObject ne ""} return
+    if {$interface ne ""} {
+       my setInterface
+       return
+    }
+    ::scrollbar $frame.scroll -command "$frame.listbox yview" -takefocus 0
+    ::listbox $frame.listbox -yscroll "$frame.scroll set" -exportselection no
+    pack $frame.scroll -side right -fill y
+    pack $frame.listbox -expand yes -fill both
+    
+    eval $frame.listbox insert 0 [Sqlinterface getInterfacesNamesCleaned]
+
+    while {$interface eq "" && $userAction ne "cancel"} { 
+       my suspendUntilSignal
+       if {$userAction eq "cancel"} break
+       if {[set cur [$frame.listbox curselection]] ne ""} {
+           set interface [$frame.listbox get $cur]
+           my setInterface
+       }
+    }
+    pack forget $frame.listbox $frame.scroll
+}
+IDEDBConnectDialog instproc init {} {
+    my buildMainWindow 
+    my requireNamespace
+}
+IDEDBConnectDialog instproc makeModelessDialog {} {
+    my instvar oldFocus oldGrab win
+    if {![my exists result]} {
+       my set result {}
+    }
+    set oldFocus [focus]
+    set oldGrab [::grab current $win]
+    if {$oldGrab != ""} {
+        set grabStatus [::grab status $oldGrab]
+    }
+    #::grab $win
+    focus $win
+    wm protocol [winfo toplevel $win] WM_DELETE_WINDOW [list [self] signalFree]
+}
+IDEDBConnectDialog instproc prompt {} {
+   my instvar userAction
+   wm deiconify [my set win]
+   set userAction _
+   my getInterface
+   if {$userAction eq "cancel"} {
+	my cleanUpAfterSignal
+	return
+   }
+   my getConnectionArguments
+   my cleanUpAfterSignal
+   if {$userAction eq "cancel"} return
+   return  [my connectArgs]
+}
+IDEDBConnectDialog instproc setConnectionToDB {} {
+    [my connectionObject] connect [my connectArgs]
+}
+IDEDBConnectDialog instproc setInterface {} {
+    my instvar interface connectionObject withSchemaExt
+    set connectionClass [Sqlinterface loadInterface $interface]
+    set connectionObject [$connectionClass new]
+}
+IDEDBConnectDialog instproc signalFree {} {
+   global dialogSemaphore
+   set dialogSemaphore 1
+}
+IDEDBConnectDialog instproc suspendUntilSignal {} {
+     my makeModelessDialog
+     global dialogSemaphore
+     vwait dialogSemaphore
+}
+@ IDEDBConnectDialog proc setConnectionOn {} {
+description {Offer Tk GUI dialog to establish sql connection
+if interface object are specified this interface will be used 
+Example: For connect mysql
+
+IDEDBConnectDialog setConnectionOn MySql
+If object is empty the user can choose the interface
+
+IDEDBConnectDialog setConnectionOn {}
+
+You can also pass some default values (as returned from getconnectionargs)
+IDEDBConnectDialog setConnectionOn MySql {user root host 127.0.0.1}
+
+}
+}
+IDEDBConnectDialog proc setConnectionOn {object {connectArgs {}}} {
+    set inst [my new -connectionObject $object -connectArgs $connectArgs]
+    $inst prompt
+    if {[$inst set userAction] ne "cancel" && [$inst set userAction] ne ""} {
+        $inst setConnectionToDB
+    }
+    set conn [$inst connectionObject]
+    if {$conn eq "" || ![$conn isConnected]} {
+        set msg empty
+        if {$conn ne ""} {
+            set msg [$conn errorMessage]
+        }
+        my tkMessage "DB count not be connected with message:\n$msg"
+    }
+    $inst destroy
+    return $conn
+}
+IDEDBConnectDialog proc setConnectionOnExt {interface withSchemaExt {connectArgs {}} {writefile 0}} {
+    set inst [my new -interface $interface -connectArgs $connectArgs -withSchemaExt $withSchemaExt -writefile $writefile]
+    $inst prompt
+    if {[$inst set userAction] ne "cancel" && [$inst set userAction] ne ""} {
+        $inst setConnectionToDB
+    } else {
+        return 
+    }
+    set conn [$inst connectionObject]
+    if {$conn eq "" || ![$conn isConnected]} {
+        set msg empty
+        if {$conn ne ""} {
+            set msg [$conn errorMessage]
+        }
+        my tkMessage "DB count not be connected with message:\n$msg"
+    }
+    $inst destroy
+    return $conn
+}
+IDEDBConnectDialog proc tkMessage text {
+    set fwin [focus]
+    set parent .
+    if {$fwin!={}} { set parent [winfo toplevel $fwin] }
+    return [tk_messageBox -title {Message} -message $text -icon warning -type ok -parent $parent]
+}
+@ Class IDEDBConnectFrame {
+description {The inner connection frame.
+It can be used if you want to have connection dialog inside
+of windows of your control}
+}
+Class IDEDBConnectFrame -parameter {win connectionObject connectArgs {writefile 0}}
+@ ::IDEDBConnectFrame idemeta component xdobry::sql
+IDEDBConnectFrame instproc changeFile {name mode} {
+    my instvar win
+    set parent [winfo toplevel $win]
+    if {$mode eq "r"} {
+       $win.f$name configure -text [tk_getOpenFile -parent $parent]
+    } else {
+       $win.f$name configure -text [tk_getSaveFile -parent $parent]
+    }
+}
+IDEDBConnectFrame instproc getConnectArgs {} {
+    my instvar win parameter types
+    foreach par $parameter type $types {
+        switch $type {
+           file {
+               set v [$win.f${par} cget -text]
+               if {$v ne ""} {  set pararr($par) $v}
+           }
+           wfile {
+               set v [$win.f${par} cget -text]
+               if {$v ne ""} {  set pararr($par) $v}
+           }
+           list {
+               set pararr($par) [my set optionMenu$par]
+           }
+           default {
+               set v [$win.$par get]
+               if {$v ne ""} {  set pararr($par) $v}
+           }
+        }
+    }
+    return  [array get pararr]
+}
+IDEDBConnectFrame instproc init {} {
+    my instvar win parameter connectionObject types writefile
+    my requireNamespace
+    frame $win
+
+    set f $win.lframe
+    array set par_array [my connectArgs]
+    set y 0
+    foreach pitem [$connectionObject getconnectargs] {
+        set name [lindex $pitem 0]
+        set type [lindex $pitem 1]
+        if {$type=="file" && $writefile} {
+            set type wfile
+        }
+        set defaultValue [lindex $pitem 2]
+        if {[info exists par_array($name)]} {
+            set defaultValue $par_array($name)
+        }
+        lappend types $type
+        lappend parameter $name
+        label $win.l${name} -text $name
+        switch $type {
+           file {
+               label $win.f${name} -relief sunken -border 2 -width 50 -anchor w
+               button $win.$name -text "..." -command [list [self] changeFile $name r]   
+               grid $win.l${name} -row $y -column 0 -sticky e
+               grid $win.f${name} -row $y -column 1 -sticky e
+               grid $win.$name -row $y -column 2
+               if {$defaultValue ne ""} {
+                   $win.f${name} configure -text $defaultValue
+               }
+           }
+           wfile {
+               label $win.f${name} -relief sunken -border 2 -width 50 -anchor w
+               button $win.$name -text "..." -command [list [self] changeFile $name w]   
+               grid $win.l${name} -row $y -column 0 -sticky e
+               grid $win.f${name} -row $y -column 1 -sticky e
+               grid $win.$name -row $y -column 2
+               if {$defaultValue ne ""} {
+                   $win.f${name} configure -text $defaultValue
+               }
+           }
+           password {
+               entry $win.$name -show *
+               grid $win.l${name} -row $y -column 0 -sticky e
+               grid $win.$name -row $y -column 1 -columnspan 2 -sticky w
+               if {$defaultValue ne ""} {
+                   $win.$name insert 0 $defaultValue
+               }
+           }
+           list {
+               set olist [lindex $pitem 3]
+               if {[lsearch -exact $olist $defaultValue]<=0} {
+                   set defaultValue [lindex $olist 0]
+               }
+               my set optionMenu$name $defaultValue
+               eval tk_optionMenu $win.$name [self]::optionMenu$name $olist
+               grid $win.l${name} -row $y -column 0 -sticky e
+               grid $win.$name -row $y -column 1 -columnspan 2 -sticky w
+           }
+           default {
+               entry $win.$name
+               grid $win.l${name} -row $y -column 0 -sticky e
+               grid $win.$name -row $y -column 1 -columnspan 2 -sticky w
+               if {$defaultValue ne ""} {
+                   $win.$name insert 0 $defaultValue
+               }
+           }
+        }
+        incr y
+    }
+}
+@ Class Sqlinterface {
+description {Abstract interface (abstract wrapper interface)
+to sql commands handle such function as
+
+1. sql queries
+2. sql execute
+3. connecting database
+4. query metainformation as tables names
+5. inserting row (handle primary key)
+
+The interface use so called query objects that are normal xotcl objects.
+
+Following methods are public API
+-getconnectionargs
+-connect
+-diconnect
+-isConnected
+-hasfunction
+-hasDatabase
+-escape
+-errorMessage
+
+-execute
+-returnAffectedRows
+-insertRow
+-query
+-queryList
+
+All interface errors can be read from parameter errorMessage
+
+}
+}
+Class Sqlinterface -parameter {dbank {connected 0} {errorMessage {}}}
+@ ::Sqlinterface idemeta categories {public-api private schema-api}
+@ ::Sqlinterface idemeta categoriesMethods {{connect disconnect getconnectargs isConnected returnAffectedRows query queryList execute insertRow hasfunction insertRowAutoId getTimeStampFunction escape} {dateFormat destroy setdb} {extract_schema getTables extract_table}}
+@ ::Sqlinterface idemeta component xdobry::sql
+Sqlinterface instproc closeUnitOfWork {} {
+}
+@ Sqlinterface instproc connect {} {
+description {Await a list of connection parameter for example
+{user root db xotcllib}
+Use array get to generate such list from array}
+}
+Sqlinterface instproc connect par_list {error {Abstract method connect par_list called}}
+Sqlinterface instproc dateFormat date {
+    return $date
+}
+Sqlinterface instproc destroy {} {
+    # Vielleicht bracht das Klassenkind noch die Verbindung
+    #next
+    # Next verursacht ein Fehler +++ ::Can´t find self
+    my instvar connected
+    if {[info exists connected] && $connected} {
+        my disconnect
+    }
+    next
+}
+@ Sqlinterface instproc disconnect {} {
+description {disconnect the database connection
+
+The destroing interface object also desconnct from database}
+}
+Sqlinterface instproc disconnect {} {error {Abstract method disconnect  called}}
+@ Sqlinterface instproc escape {} {
+description mask\ all\ sql\ string\ by\ replacing\ string\ delmiter\ with\ \\\nfor\ example\nsder\"ewr\ \ -\ adef\\\"eer\n
+}
+Sqlinterface instproc escape string {
+    string map [list \0 \\0 ' ''] $string
+}
+@ Sqlinterface instproc execute {} {
+description {execute sql command
+if returnAffectedRows anser 1 (yes) the the result
+is the number of rows that are affected by the command}
+}
+Sqlinterface instproc execute sql {error {Abstract method execute called}}
+@ Sqlinterface instproc extract_schema {} {
+description {The schema-api works after visitor pattern.
+The visitor must implement to methods newtable {name} and newattribute {attr_list}}
+}
+Sqlinterface instproc extract_schema visitor {
+    foreach table [my getTables] {
+        $visitor newtable $table
+        my extract_table $visitor $table
+    }
+}
+Sqlinterface instproc extract_table {visitor table} {
+    error "abstract methode. should be overwritten"
+}
+Sqlinterface instproc getMaskedValue {value type} {
+    if {$type eq "datetime" || $type eq "timestamp"} {
+        return [my getTimeValue $value]
+    } elseif {[my needEscape $type]} {
+        return '[my escape $value]' 
+    } else {
+        return $value
+    }
+}
+Sqlinterface instproc getTables {} {
+    error "abstract method. should be overwritten"
+}
+Sqlinterface instproc getTimeStampFunction {} {
+    return "NOW()"
+}
+Sqlinterface instproc getTimeValue time {
+    return '$time'
+}
+@ Sqlinterface instproc getconnectargs {} {
+description {return information about connection parameters
+list of list with elements
+<ul>
+<li>name of argument
+<li>type of argument (text integer password)
+<li>default of argument
+</ul>}
+}
+Sqlinterface instproc getconnectargs {} {error {Abstract method getconnectargs  called}}
+@ Sqlinterface instproc hasfunction {} {
+description {check if the interface or query object support function with name}
+}
+Sqlinterface instproc hasfunction func {
+    foreach obj [[my info class] info children] {
+       if {[Object isclass $obj]} {
+         set iclass $obj
+         break
+       }
+    }
+
+    if {[[my info class] info instprocs $func] ne ""} {
+        return 1
+    } 
+    
+    if {[$iclass info instprocs $func] ne ""} {
+        return 1
+    } else {
+        return 0
+    }
+}
+@ Sqlinterface instproc insertRow {} {
+description {confort api to sql command
+<source>INSERT INTO table (col1,col2,..) VALUES (val1,val2,..)</source>}
+}
+Sqlinterface instproc insertRow {table columns values {types {}}} {
+    set vals {}
+    foreach val $values type $types {
+        if {$vals ne ""} {append vals ,}
+        if {$val eq "NULL" || $val eq [my getTimeStampFunction]} {
+            append vals $val
+        } else {
+            append vals [my getMaskedValue $val $type]
+        }
+    }
+    set mcolumns [list]
+    foreach c $columns {
+        lappend mcolumns [my maskColumnName $c]
+    }
+    my execute "INSERT INTO [my maskTableName $table] ([join $mcolumns ,]) VALUES ($vals)"
+}
+@ Sqlinterface instproc insertRowAutoId {} {
+description {Insert row and try to compute the autoid for primary key.
+The implementation is dependend from undelying base interface
+mysql supports autoid, postgres has sequencer
+by odbc und sqlite special sequencer database are used}
+}
+Sqlinterface instproc insertRowAutoId {table columns values primarykey sequenzer} {error {Abstract method insertRowAutoId  called}}
+@ Sqlinterface instproc isConnected {} {
+description {return the state of connection}
+}
+Sqlinterface instproc isConnected {} {
+    return [my set connected]
+}
+Sqlinterface instproc isNull value {
+    expr {$value eq ""}
+}
+Sqlinterface instproc maskColumnName columnName {
+    my maskTableName $columnName
+}
+@ Sqlinterface instproc maskTableName {} {
+description {Some database allow to have space in table name (access, ms-sql)
+and need masking with [example table]
+by another the name would be converted to exmaple_table}
+}
+Sqlinterface instproc maskTableName tableName {
+    if {[string first " " $tableName]>=0} {
+        return "\[$tableName\]" 
+    }
+    return $tableName
+}
+Sqlinterface instproc needEscape type {
+    expr {[lsearch {decimal int boolean smallint money} $type]<0}
+}
+Sqlinterface instproc openUnitOfWork {} {
+}
+@ Sqlinterface instproc query {} {
+description {return query object see API to
+MySql::SqlQuerry to get all documentation
+<p>
+empty string is return if error occurs. The error message can be
+retrieve by interface parameter ($interface errorMessage)
+<p>
+Warning!
+All queries must be destroyed to free query resource}
+}
+Sqlinterface instproc query sql {error {Abstract method query called}}
+@ Sqlinterface instproc queryList {} {
+description {Return result of query statement as Tcl list}
+}
+Sqlinterface instproc queryList sql {error {Abstract method queryList called}}
+@ Sqlinterface instproc returnAffectedRows {} {
+description {inform with 1 or 0 if method execute
+returns the number of affected rows by DELETE, UPDATE or INSERT statements}
+}
+Sqlinterface instproc returnAffectedRows {} {
+    return 0
+}
+Sqlinterface instproc setdb dbname {error {Abstract method setdb dbname called}}
+@ Sqlinterface proc getInterfaces {} {
+description {Return list of list of all supported interfaces
+the sublists have elements:
+
+tcl-interface name
+xosql name
+xosql interface class
+base interface package}
+}
+Sqlinterface proc getInterfaces {} {
+   # name
+    return {
+        {mysql MySql xdobry::mysql mysqltcl}
+        {ODBC ODBC xdobry::odbc tclodbc}
+        {postgres PgSql xdobry::pgsql Pgtcl}
+        {sqlite Sqlite xdobry::sqlite sqlite}
+        {MSAccess ODBCAccess xdobry::access tclodbc}
+        {MSSql ODBCMSSql xdobry::mssql tclodbc}
+        {Oracle ORATcl xdobry::oratcl Oratcl}
+        {Metakit XOMetakit xometakit Mk4tcl}
+    }
+}
+@ Sqlinterface proc getInterfacesCleaned {} {
+description {Same as getInterfaces method but
+not return interfaces that are not installed on the system}
+}
+Sqlinterface proc getInterfacesCleaned {} {
+    set ret []
+    global tcl_platform
+    catch {package require not_exists}
+    set packages [package names]
+    foreach interfaces [my getInterfaces] {
+        set pkg [lindex $interfaces 3]
+        if {[lindex $interfaces 0] eq "ms_access" && $tcl_platform(platform) ne "windows"} continue
+        if {[lindex $interfaces 0] eq "ms_sql" && $tcl_platform(platform) ne "windows"} continue
+        if {[lsearch $packages [lindex $pkg 0]]>=0 ||
+            [file exists [lindex $pkg 1]]} {
+            lappend ret $interfaces
+        }
+    }
+    return $ret
+}
+@ Sqlinterface proc getInterfacesNames {} {
+description {Get names of all supported interfaces}
+}
+Sqlinterface proc getInterfacesNames {} {
+   # name 
+   set names {}
+   foreach name [my getInterfaces] {
+       lappend names [lindex $name 0]
+   }
+   return $names
+}
+@ Sqlinterface proc getInterfacesNamesCleaned {} {
+description {Same as getInterfacesNames method but
+not return interfaces that are not installed on the system}
+}
+Sqlinterface proc getInterfacesNamesCleaned {} {
+   # name 
+   set names {}
+   foreach name [my getInterfacesCleaned] {
+       lappend names [lindex $name 0]
+   }
+   return $names
+}
+@ Sqlinterface proc loadInterface {} {
+description {Load interface with name (same as specified returned from
+getInterfacesNames) and return the interface class.
+
+It is factory method for sql interfaces}
+}
+Sqlinterface proc loadInterface name {
+    foreach desc [my getInterfaces] {
+        if {[lindex $desc 0]==$name} {
+            package require [lindex $desc 2]
+            set iclass [lindex $desc 1]
+            $iclass initializeInterface
+            return $iclass
+        }
+    }
+    error "no interface $name"
+}
+

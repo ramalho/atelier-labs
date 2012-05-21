@@ -1,0 +1,679 @@
+# automatically generated from XOTclIDE
+# script require component {IDECore IDEBaseGUI IDEView IDETclParser}
+@ Component IDEEditor {
+description {Xotcl Text Editing
+
+Find and Replace Object
+
+In the future place for such things as
+1. syntax hightlighting
+2. indenting
+3. delegation to syntax checker in IDETclParser component}
+}
+package provide IDEEditor 0.81
+package require IDEBaseGUI
+package require IDECore
+package require IDETclParser
+package require IDEView
+
+@ tclproc handleDoublePress idemeta struct IDEEditor tkbindhandles
+proc handleDoublePress object {
+    if {[$object doubleButton]} {
+        return -code break
+    }
+}
+@ tclproc handleTabPress idemeta struct IDEEditor tkbindhandles
+proc handleTabPress object {
+    if {[$object tabPress]} {
+        return -code break
+    }
+}
+@ Class IDE::TclModeEdit {
+description {Tcl Mode
+
+supports function
+1. code completion
+ - self xotcl call
+ - tcl procedures/commands
+ - tcl subcommands
+ - variables
+2. Selecting parenthesis areas by double-click
+3. interface to syntax hightlighting
+4. Statix Syntax Checking}
+}
+Class IDE::TclModeEdit -superclass {::IDE::MethodEdit ::IDE::EditorPopDown} -parameter {{editMode none}}
+@ ::IDE::TclModeEdit idemeta categories {syntax-hightlighting context-quick-edit tcl-lint edit-helper initialize interface}
+@ ::IDE::TclModeEdit idemeta categoriesMethods {{syntaxHighlight syntaxHighlightRemove complexSyntaxHighlight setType simpleSyntaxHighlight syntaxHighlightIfWanted} {getProcSubcommand getInstanceCommand invokePopDown getVariable tabPress} {lintIfWanted xotclLint} {getIdent searchCloseBrace searchCloseQuote searchOpenBrace keyReturn doubleButton} {initTags menuInsertions init} {saveValue setText}}
+@ ::IDE::TclModeEdit idemeta component IDEEditor
+IDE::TclModeEdit instproc addIndent {} {
+    set twin [my getTextWindow]
+    set lines [my getSelectedLines]
+    for {set x [lindex $lines 0]} {$x<=[lindex $lines 1]} {incr x} {
+        $twin insert $x.0 "    "
+    }
+}
+IDE::TclModeEdit instproc autoIndent {} {
+    set twin [my getTextWindow]
+    set lines [my getSelectedLines]
+    set startline [lindex $lines 0]
+    if {$startline==[lindex $lines 1]} return
+    set indent [my getIdentFromLine $startline]
+    if {[$twin get "$startline.end - 1 c"] eq "\{"} {
+        incr indent 4
+    }
+    for {set x [expr {$startline+1}]} {$x<=[lindex $lines 1]} {incr x} {
+        set wordbeginn [$twin search -regexp {\S} $x.0 $x.end]
+        if {$wordbeginn ne ""} {
+            set indentString [$twin get $x.0 $wordbeginn]
+            if {$indentString ne ""} {
+                $twin delete $x.0 $x.[string length $indentString]
+            }
+            if {[$twin get $x.0] eq "\}"} {
+                incr indent -4
+            }
+            if {$indent<0} {set indent 0}
+            $twin insert $x.0 [string repeat " " $indent]
+            set pos [$twin search -regexp -backward {\S} $x.end $x.0]
+            if {$pos != "" && [$twin get $pos] eq "\{"} {
+                incr indent 4
+            }
+        }
+    }
+}
+IDE::TclModeEdit instproc breakpointRemoved bpoint {
+    my instvar breakpoint
+    if {$breakpoint ne ""} {
+        my unvisibleBreakpoint
+        set breakpoint ""
+    }
+}
+IDE::TclModeEdit instproc canSetBreakpoint {} {
+   my instvar vtype editMode breakpoint
+   return [expr {$editMode eq "xotcl" && $vtype eq "Source" && [info exists breakpoint] && $breakpoint eq ""}]
+}
+IDE::TclModeEdit instproc commentRegion {} {
+    set twin [my getTextWindow]
+    set lines [my getSelectedLines]
+    for {set x [lindex $lines 0]} {$x<=[lindex $lines 1]} {incr x} {
+        set wordbeginn [$twin search -regexp {\S} $x.0 $x.end]
+        if {$wordbeginn ne ""} {
+            if {[$twin get $wordbeginn] ne "#"} {
+                $twin insert $wordbeginn #
+                $twin tag remove quoted $wordbeginn $x.end
+                $twin tag remove variable $wordbeginn $x.end
+                $twin tag remove tclproc $wordbeginn $x.end
+                $twin tag remove xotcl $wordbeginn $x.end
+                $twin tag remove hlight $wordbeginn $x.end
+                $twin tag add comment $wordbeginn $x.end
+            }
+        }
+    }
+}
+IDE::TclModeEdit instproc complexSyntaxHighlight {} {
+    set prs [PrsSyntaxHightlight new -volatile -text [self]]
+    set text [my getText]
+    if {$text ne ""} {
+        $prs parseAndVisit [my getText]
+    }
+}
+IDE::TclModeEdit instproc doubleButton {} {
+   if {![my set useEditMode]} return
+   set twin [my getTextWindow]
+   set iindex [$twin index insert]
+   set index [$twin index {insert - 1 c}]
+   set bc [$twin get $index $iindex]
+   set bindex [string first $bc "\{\[\"" 0]
+   if {$bindex>=0} {
+       set cb [string index "\}\]\"" $bindex]
+       if {$bc=="\""} {
+          set endindex [my searchCloseQuote [$twin get $index end]]
+       } else {
+          set endindex [my searchCloseBrace [$twin get $index end] $bc $cb]
+       }
+       if {$endindex!=-1} {
+          $twin tag remove sel 1.0 end
+          $twin tag add sel $index "$iindex + $endindex c"
+          return 1
+       }
+   }
+   set bindex [string first $bc "\}\]" 0]
+   if {$bindex>=0} {
+       set cb [string index "\{\[" $bindex]
+       set endindex [my searchOpenBrace [$twin get 1.0 $iindex] $bc $cb]
+       if {$endindex!=-1} {
+          $twin tag remove sel 1.0 end
+          $twin tag add sel "$iindex - $endindex c" $iindex
+          return 1
+       }
+   }
+   return 0
+}
+IDE::TclModeEdit instproc editBreakpoint {} {
+    IDE::BreakpointEdit editBreakpoint [my set breakpoint]
+}
+IDE::TclModeEdit instproc getBaseIdentifiers pattern {
+    set twin [my getTextWindow]
+    set class [$twin get 1.0 {1.0 lineend}]
+    regexp {(^[\w:]+)\s+([\w:]+)} $class _ class method
+    set mlist [list]
+    if {[Object isobject $class]} {
+        set ns $class
+    } elseif {$class eq "proc"} {
+        set ns $method
+    }
+    set ns [namespace qualifiers $ns]
+    if {[string range $ns 0 2] ne "::"} {
+        set ns "::$ns"
+    }
+    if {[namespace exists $ns]} {
+        set mlist [namespace eval $ns info procs $pattern]
+        set mlist [concat $mlist [namespace eval $ns info commands $pattern]]
+    }
+    set mlist [concat $mlist [namespace eval :: info procs $pattern]]
+    set mlist [concat $mlist [namespace eval :: info commands $pattern]]
+    set mlist [lsort -unique $mlist]
+    my invokePopDown $mlist $pattern
+}
+IDE::TclModeEdit instproc getBodyStart {} {
+    my instvar vclass vctype method
+    set text [my getText]
+    if {$vctype eq "Tcl Procs"} {
+        set elem 3
+    } else {
+        set elem 4
+    }
+    string first [lindex $text $elem] $text
+}
+@ IDE::TclModeEdit instproc getIdent {} {
+description return\ count\ of\ indent\ space\ or\nminus\ count\ of\ indent\ space\ if\ new\ open\ brace\ \{
+}
+IDE::TclModeEdit instproc getIdent {} {
+    set twin [my getTextWindow]
+    set lineStart [$twin index "insert -1 l linestart"]
+    set line [$twin get $lineStart [$twin index "$lineStart lineend"]]
+    set length [string length $line]
+    for {set i 0} {[string is space [string index $line $i]] && $i<$length} {incr i} {}
+    if {[string index $line end] eq "\{"} {
+        incr i 4
+        set i [expr -$i]
+    }
+    return $i
+}
+IDE::TclModeEdit instproc getIdentFromLine line {
+    set twin [my getTextWindow]
+    set wordbeginn [$twin search -regexp {\S} $line.0 $line.end]
+    if {$wordbeginn ne ""} {
+        set indentString [$twin get $line.0 $wordbeginn]
+        set indent 0
+        for {set x 0} {$x<[string length $indentString]} {incr x} {
+            if {[string index $indentString $x] eq "\t"} {incr indent 4}
+            if {[string index $indentString $x] eq " "} {incr indent}
+        }
+        return $indent
+    }
+    return 0
+}
+IDE::TclModeEdit instproc getInstanceCommand pattern {
+    # class shoul be the first word in the window
+    set twin [my getTextWindow]
+    set class [$twin get 1.0 {1.0 lineend}]
+    regexp {(^[\w:]+)\s+(\w+)} $class _ class method
+    if {![Object isobject $class]} return
+    set mlist {}
+    if {![Object isclass $class] || $method eq "proc"} {
+        set mlist [$class info procs $pattern]
+        set mlist [concat $mlist [lsearch -inline -all [list create instdestroy instfilter instfilterappend instfilterguard instinvar instmixin instmixinappend instparametercmd instproc insttclcmd new] $pattern]]
+    } else {
+        foreach hclass [concat $class [$class info heritage]] {
+            if {$hclass eq "::xotcl::Object"} continue
+            set mlist [concat $mlist [$hclass info instprocs $pattern]]
+            foreach par [$hclass info parameter] {
+                set pname [lindex $par 0]
+                if {[string match $pattern $pname]} {
+                    lappend mlist $pname
+                }
+            }
+        }
+    }
+    set mlist [concat $mlist [lsearch -inline -all [list abstract append array autoname check class copy destroy eval exists filter filterappend filterguard filtersearch hasclass incr info instvar invar isclass ismetaclass ismixin isobject istype lappend mixin mixinappend move requireNamespace set setExitHandler trace unset vwait] $pattern]]
+    set mlist [lsort -unique $mlist]
+    my invokePopDown $mlist $pattern
+}
+IDE::TclModeEdit instproc getProcSubcommand {command pattern} {
+    set mlist {}
+    foreach elem [PrsContext array names command_${command}] {
+        if {[string match $pattern $elem]} {
+            lappend mlist $elem
+        }
+    }
+    my invokePopDown $mlist $pattern
+}
+IDE::TclModeEdit instproc getSelectedLines {} {
+    set twin [my getTextWindow]
+    set range [$twin tag ranges sel]
+    if {$range eq ""} {
+        set cursor [$twin index insert]
+        set line [lindex [split $cursor .] 0]
+        return [list $line $line]
+    } else {
+        return [list [lindex [split [lindex $range 0] .] 0]  [lindex [split [lindex $range 1] .] 0]]
+    }
+}
+IDE::TclModeEdit instproc getVariable pattern {
+    # class shoul be the first word in the window
+    set twin [my getTextWindow]
+    set bpattern $pattern
+    append pattern *
+    set fline [$twin get 1.0 {1.0 lineend}]
+    set text [$twin get 1.0 end]
+    set start 0
+    set varlist {}
+    if {[regexp {proc [\w:]+ ([\w]+)} $fline _ vlist]} {
+        set varlist [concat $vlist]
+    } elseif {[regexp {proc [\w:]+ \{([\w ]+)\}} $fline _ vlist]} {
+        set varlist [concat $vlist]
+    }
+    while {[regexp -line -indices -start $start {instvar ([\w ]+)$} $text mall vlist]} {
+        set start [lindex $mall 1]
+        set varlist [concat $varlist [string range $text [lindex $vlist 0] [lindex $vlist 1]]]
+   }
+    set start 0
+    while {[regexp -line -indices -start $start {global ([\w ]+)$} $text mall vlist]} {
+        set start [lindex $mall 1]
+        set varlist [concat $varlist [string range $text [lindex $vlist 0] [lindex $vlist 1]]]
+    }
+    set rcommands {
+        {set ([\w]+) .*$}
+        {foreach ([\w]+) .*$}
+        {append ([\w]+) .*$}
+        {lappend ([\w]+) .*$}
+        {upvar ([\w]+) .*$}
+        {variable ([\w]+)}
+        {\$([\w]+)}
+    }
+    foreach r $rcommands {
+        set start 0
+        while {[regexp -line -indices -start $start $r $text mall vlist]} {
+            set start [lindex $mall 1]
+            set varlist [concat $varlist [string range $text [lindex $vlist 0] [lindex $vlist 1]]]
+        }
+    }
+    set varlist [ide::lselect each $varlist {[string match $pattern $each] && $each!=$bpattern}]
+    set varlist [lsort -unique $varlist]
+    my invokePopDown $varlist $pattern
+}
+IDE::TclModeEdit instproc init args {
+    next
+    my set useEditMode 1
+    my set syntaxHightlight 2
+    my set xotclLint 1
+    my set beginReturn 0
+    set twin [my getTextWindow]
+
+    bind $twin <KeyRelease-Return> [list [self] keyReturn]
+    bind $twin <Return> [list [self] set beginReturn 1]
+    bind $twin <KeyPress-Tab> [list handleTabPress [self]]
+    bind $twin <Control-KeyPress-space> [list handleTabPress [self]]
+    bind $twin <Double-Button-1> [list handleDoublePress [self]]
+}
+IDE::TclModeEdit instproc initTags {} {
+    set twin [my getTextWindow]
+    $twin tag configure comment -foreground red
+    $twin tag configure quoted -foreground SpringGreen3
+    # full hightligthing
+    $twin tag configure variable -foreground blue
+    $twin tag configure tclproc -foreground brown
+    $twin tag configure xotcl -foreground orange
+    next
+}
+IDE::TclModeEdit instproc invokePopDown {mlist pattern} {
+    if {$mlist eq ""} return
+    my instvar compPattern
+    set compPattern $pattern
+    if {[llength $mlist]==1} {
+        set sindex [expr {[string length $compPattern] + [string first [string range $compPattern 0 end-1] $mlist] -1}]
+        my appendToCursor "[string range $mlist $sindex end]"
+        return
+    }
+    set twin [my getTextWindow]
+    set popWin [my getPopdown]
+    $popWin.listbox delete 0 end
+    eval $popWin.listbox insert 0 $mlist
+    set height [winfo reqheight $popWin.listbox]
+    set width [expr {[winfo reqwidth $popWin.listbox]+[winfo reqwidth $popWin.scroll]}]
+    set bb [$twin bbox insert]
+    set x [expr {[lindex $bb 0]+[winfo rootx $twin]}]
+    set y [expr {[lindex $bb 1]+[winfo rooty $twin]}]
+    wm geometry $popWin $width\x$height+$x+$y
+    wm deiconify $popWin
+    raise $popWin
+    ::focus $popWin.listbox
+}
+IDE::TclModeEdit instproc keyReturn {} {
+    # binding for Return key
+    if {![my set useEditMode]} return
+    if {![my set beginReturn]} return
+    my set beginReturn 0
+
+    if {[my editMode] eq "xotcl"} {
+        set tabCount [my getIdent]
+        if {$tabCount>0} {
+            my appendToCursor [string repeat { } $tabCount]
+        } elseif {$tabCount<0} {
+            set tabCount [expr {-$tabCount}]
+            my appendToCursor [string repeat { } $tabCount]
+            set win [my getTextWindow]
+            if {[$win index {insert lineend + 1 c}]==[$win index end]} {
+                set insert [$win index insert]
+                $win insert end "\n[string repeat { } [expr {$tabCount-4}]]\}\n"
+                $win mark set insert $insert
+            } else {
+                $win insert {insert lineend + 1 c} "[string repeat { } [expr {$tabCount-4}]]\}\n"
+            }
+        }
+    }
+}
+IDE::TclModeEdit instproc lintIfWanted text {
+    if {[my set xotclLint] && [my set editMode] eq "xotcl"} {
+        return [[my set controler] syntaxCheck $text [self]]
+    }
+    return 1
+}
+IDE::TclModeEdit instproc makeMCGetter {} {
+    set twin [my getTextWindow]
+    set range [$twin tag ranges sel]
+    if {$range ne ""} {
+        set b [lindex $range 0]
+        set f [lindex $range 1]
+        if {[$twin get "$f - 1 char" $f] eq "\}"} {
+            $twin delete "$f - 1 char" $f
+            $twin insert "$f - 1 char" {"]}
+        } elseif {[$twin get "$f - 1 char" $f] ne "\""} {
+            $twin insert $f {"]}
+        } else {
+            $twin insert $f {]}
+        }
+        if {[$twin get $b "$b + 1 char"] eq "\{"} {
+            $twin delete $b  "$b +1 char"
+            set mc mc
+            $twin insert $b "\[$mc \""
+        } elseif {[$twin get $b "$b + 1 char"] ne "\""} {
+            set mc mc
+            $twin insert $b "\[$mc \""
+        } else {
+            $twin insert $b {[mc }
+        }
+    }
+}
+IDE::TclModeEdit instproc menuInsertions ms {
+    $ms addCheckButton {Xotcl Edit Mode} [self]::useEditMode
+
+    set m ${ms}::codeoperation
+    IDE::MenuStruct $m {Code Operation}
+    $ms addCascadeMenu $m
+    $m addCommand {Add Indent} [list [self] addIndent]
+    $m addCommand {Minus Indent} [list [self] minusIndent]
+    $m addCommand {Auto Indent} [list [self] autoIndent] {} {Control-T}
+    $m addCommand {Comment} [list [self] commentRegion]
+    $m addCommand {Uncomment} [list [self] uncommentRegion]
+    $m addCommand {make msgcat::mc getter} [list [self] makeMCGetter] {} {Alt-i}
+
+    set m ${ms}::vcontrol
+    IDE::MenuStruct $m {Syntax Hightlight}
+    $ms addCascadeMenu $m
+    $m addRadioButton {No Syntax Hightlight} [self]::syntaxHightlight {} 0
+    $m addRadioButton {Simple Syntax Hightlight} [self]::syntaxHightlight {} 1
+    $m addRadioButton {Complext Syntax Hightlight} [self]::syntaxHightlight {} 2
+    $m addSeparator
+    $m addCommand {Force Syntax Highlight} [list [self] syntaxHighlight]
+    $m addCommand {Force Syntax Check} [list [self] syntaxCheck]
+    $m addCommand {Drop Syntax Highlight} [list [self] syntaxHighlightRemove]
+
+    $ms addCheckButton {Syntaxcheck on Save} [self]::xotclLint
+
+    $ms addCommand2 {Set Breakpoint} [list [self] setBreakpoint] {canSetBreakpoint haveNoChanges}
+}
+IDE::TclModeEdit instproc minusIndent {} {
+    set twin [my getTextWindow]
+    set lines [my getSelectedLines]
+    for {set x [lindex $lines 0]} {$x<=[lindex $lines 1]} {incr x} {
+        set wordbeginn [$twin search -regexp {\S} $x.0 $x.end]
+        if {$wordbeginn ne ""} {
+            set indentString [$twin get $x.0 $wordbeginn]
+            for {set cuts 0} {$cuts<4 && $cuts<[string length $indentString]} {incr cuts} {
+                if {[string index $indentString $cuts] eq "\t"} break
+                if {[string index $indentString $cuts] ne " "} break
+            }
+            $twin delete $x.0 $x.$cuts
+        }
+    }
+}
+IDE::TclModeEdit instproc saveSource text {
+    if {[my lintIfWanted $text]} next
+}
+IDE::TclModeEdit instproc saveValue value {
+    next
+    my syntaxHighlightIfWanted
+}
+IDE::TclModeEdit instproc searchCloseBrace {text obrace cbrace} {
+    set len [string length $text]
+    set open 0
+    for {set x 0} {$x<$len} {incr x} {
+        set c [string index $text $x]
+        if {$c eq "\\"} {
+            incr x
+            continue
+        }
+        if {$c==$obrace} {
+            incr open
+        } elseif {$c==$cbrace} {
+            incr open -1
+            if {$open==0} {return $x}
+        }
+    }
+    return -1
+}
+IDE::TclModeEdit instproc searchCloseQuote text {
+    set len [string length $text]
+    for {set x 1} {$x<$len} {incr x} {
+        set c [string index $text $x]
+        if {$c eq "\\"} {
+            incr x
+            continue
+        }
+        if {$c eq "\""} {
+            return $x
+        }
+    }
+}
+IDE::TclModeEdit instproc searchOpenBrace {text obrace cbrace} {
+    set len [string length $text]
+    set open 0
+    for {set x $len} {$x>0} {incr x -1} {
+        set c [string index $text $x]
+        if {[string index $text [expr {$x-1}]] eq "\\"} {
+            incr x -1
+            continue
+        }
+        if {$c==$obrace} {
+            incr open
+        } elseif {$c==$cbrace} {
+            incr open -1
+            if {$open==0} {return [expr {$len-$x}]}
+        }
+    }
+    return -1
+}
+IDE::TclModeEdit instproc setBodyTextControler {class type method controler} {
+    next
+    my instvar breakpoint
+    if {[info exists breakpoint] && $breakpoint ne ""} {
+        $breakpoint removeInterestFrom [self]
+    }
+    my set breakpoint [IDE::BreakpointFasade searchBreakpoint $type $class $method]
+    if {[my set breakpoint] ne ""} {
+        my visibleBreakpoint
+    } else {
+        my unvisibleBreakpoint
+    }
+}
+IDE::TclModeEdit instproc setBreakpoint {} {
+    my instvar vctype vtype vclass method
+    set insertPos [string length [[my getTextWindow] get 1.0 insert]]
+    set position [expr {$insertPos-[my getBodyStart]}]
+    my set breakpoint [IDE::BreakpointFasade setNewBreakpoint $vctype $vclass $method $position]
+    my visibleBreakpoint
+}
+IDE::TclModeEdit instproc setText text {
+    next
+    my syntaxHighlightIfWanted
+}
+IDE::TclModeEdit instproc setType type {
+    my set editMode $type
+}
+IDE::TclModeEdit instproc simpleSyntaxHighlight {} {
+    my tagRegExprTextAll comment {(?n)^\s*[^\\]#.+$}
+        set twin [my getTextWindow]
+        set cur 1.0
+        while 1 {
+            set cur [$twin search -regexp -count count -- {[^\\]"} $cur end]
+        if {$cur ne ""} {
+            set qend [$twin search -regexp -- {[^\\]"} "$cur + 1 char" end]
+            if {$qend ne ""} {
+                set qend [$twin index "$qend + 1 char"]
+                $twin tag add quoted "$cur + $count char" $qend
+                set cur $qend
+            } else {
+                break
+            }
+        } else {
+            break
+        }
+    }
+}
+IDE::TclModeEdit instproc syntaxCheck {} {
+    if  {[my set editMode] eq "xotcl"} {
+        return [[my set controler] syntaxCheck [my getText] [self]]
+    }
+}
+IDE::TclModeEdit instproc syntaxHighlight {} {
+    my syntaxHighlightRemove
+    switch [my set syntaxHightlight] {
+        1 { my simpleSyntaxHighlight }
+        2 { my complexSyntaxHighlight }
+    }
+}
+IDE::TclModeEdit instproc syntaxHighlightIfWanted {} {
+    if {[my set syntaxHightlight] && [my set editMode] eq "xotcl" && [my set vtype] eq "Source"} {
+        my syntaxHighlight
+    }
+}
+IDE::TclModeEdit instproc syntaxHighlightRemove {} {
+    set twin [my getTextWindow]
+    $twin tag remove quoted 0.0 end
+    $twin tag remove comment 0.0 end
+    $twin tag remove variable 0.0 end
+    $twin tag remove tclproc 0.0 end
+    $twin tag remove xotcl 0.0 end
+    $twin tag remove hlight 0.0 end
+}
+IDE::TclModeEdit instproc tabPress {} {
+    set twin [my getTextWindow]
+    set insert [$twin index insert]
+    set res [$twin get "$insert linestart" $insert]
+    if {[my editMode]=="xotcl" && [regexp {[\w\$]+} $res]} {
+       if {[regexp {([\w:\]]*)(?:[\s\[;]+|^)([:\w]+)$} $res _ basecommand fchars]} {
+           # commands has two tails. Try to complete second tails
+           #uts "res $res #bas1 $basecommand #fc $fchars"
+           if {$basecommand=="my" || $basecommand=="self\]"} {
+               # invoke own local method per my or [self]
+               my getInstanceCommand ${fchars}*
+           } elseif {[Object isobject $basecommand]} {
+               # invoke Object method direkt per object name
+               my invokePopDown [$basecommand info procs ${fchars}*] ${fchars}*
+           } elseif {[lsearch -exact [PrsContext set subcommands] $basecommand]>=0} {
+               # complete subcommand as "array get" (get is subcommand)
+               my getProcSubcommand $basecommand ${fchars}*
+           } elseif {[lsearch {set append lappend incr unset lset} $basecommand]>=0} {
+               my getVariable $fchars
+           } elseif {![string match {$*} $fchars]} {
+               my getBaseIdentifiers ${fchars}*
+           }
+       } elseif {[regexp {([\w:\]]+)\s+$} $res _ basecommand]} {
+           if {$basecommand=="my" || $basecommand=="self\]"} {
+               my getInstanceCommand *
+           } elseif {[Object isobject $basecommand]} {
+               my invokePopDown [$basecommand info procs] *
+           } elseif {[lsearch [PrsContext set subcommands] $basecommand]>=0} {
+               my getProcSubcommand $basecommand *
+           }
+       }
+       if {[regexp {\$([\w]*)$} $res _ basevariable]} {
+           my getVariable $basevariable
+       }
+    } else {
+       my appendToCursor {    }
+    }
+    return 1
+}
+IDE::TclModeEdit instproc uncommentRegion {} {
+    set twin [my getTextWindow]
+    set lines [my getSelectedLines]
+    for {set x [lindex $lines 0]} {$x<=[lindex $lines 1]} {incr x} {
+        set wordbeginn [$twin search -regexp {\S} $x.0 $x.end]
+        if {$wordbeginn ne ""} {
+            if {[$twin get $wordbeginn] eq "#"} {
+                $twin delete $wordbeginn
+                $twin tag remove comment $wordbeginn $x.end
+            }
+        }
+    }
+}
+IDE::TclModeEdit instproc unvisibleBreakpoint {} {
+    my instvar win bpwindow
+    if {[info exists bpwindow] && [winfo exists $bpwindow]} {
+        pack forget $bpwindow
+    }
+}
+IDE::TclModeEdit instproc visibleBreakpoint {} {
+    my instvar breakpoint bpwindow win
+    if {![info exists bpwindow] || ![winfo exists $bpwindow]} {
+        set bpwindow [button $win.bpbutton -text B -bg red -padx 1m -pady 0m -command [list [self] editBreakpoint]]
+    }
+    if {[$breakpoint isActive]} {
+        $bpwindow configure -bg red
+    } else {
+        $bpwindow configure -bg [lindex [$bpwindow configure -bg] 3]
+    }
+    $breakpoint addEventInteres [self] breakpointRemoved remove
+    pack $bpwindow -side left -before [my getTextWindow] -anchor n
+}
+IDE::TclModeEdit instproc xotclLint text {
+
+}
+IDE::TclModeEdit proc initializeAfterLoad {} {
+    IDE::TclModeEdit instmixin add IDE::MethodEditSynchronizatorMix
+}
+@ Class PrsSyntaxHightlight {
+description {This Class is special tcl parser context that can be used
+for syntax hightlight into IDE::Text (View for parsed method).
+How tokens will be handled is specified in syntaxHightlight method (PrsElem)}
+}
+Class PrsSyntaxHightlight -superclass ::PrsContext -parameter text
+@ ::PrsSyntaxHightlight idemeta component IDEEditor
+PrsSyntaxHightlight instproc checkObjectSelfCall {command notifier} {
+    my hightlightElement [$command getElem 0] xotcl
+}
+PrsSyntaxHightlight instproc checkTclCommand {name command notifier} {
+    if {[next]} {
+        my hightlightElement [$command getElem 0] tclproc
+    }
+}
+PrsSyntaxHightlight instproc hightlightElement {prsElem tag {shiftLeft 0} {shiftRight 0}} {
+    [my text] tagRange $tag [expr {[$prsElem begin]+$shiftLeft}] [expr {[$prsElem end]+1+$shiftRight}]
+}
+PrsSyntaxHightlight instproc visit prsElem {
+    [my parser] catchParseErrors {$prsElem syntaxHightlight [self]}
+}
+IDE::TclModeEdit initializeAfterLoad
+

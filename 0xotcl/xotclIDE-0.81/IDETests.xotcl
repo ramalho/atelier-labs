@@ -1,0 +1,1619 @@
+# automatically generated from XOTclIDE
+# script require component {IDETestFramework IDECore}
+@ Component IDETests {
+description {Base Tests for XOTclIDE System}
+}
+package provide IDETests 0.79
+package require IDECore
+package require IDETestFramework
+Class IDE::TkWindowControler
+@ ::IDE::TkWindowControler idemeta component IDETests
+IDE::TkWindowControler instproc closeWindowClass class {
+    update idletasks
+    foreach inst [$class info instances] {
+        $inst destroy
+    }
+}
+IDE::TkWindowControler instproc invokeButton {name {browser {}}} {
+   if {$browser eq ""} {
+       set swin [my set win]
+   } else {
+       set swin [$browser set win]
+   }
+   set button [my searchButton $swin $name]
+   $button invoke
+}
+IDE::TkWindowControler instproc invokeMenu args {
+   my instvar win
+   set startwin $win.mb
+   set i 0
+   foreach item $args {
+       incr i
+       set index [$startwin index $item]
+       if {$i<[llength $args]} {
+           set startwin [$startwin entrycget $index -menu]
+       }
+   }
+   $startwin invoke $index
+}
+IDE::TkWindowControler instproc searchButton {win name} {
+    foreach c [winfo children $win] {
+        if {[winfo class $c] eq "Button" && [$c cget -text]==$name} {
+            return $c
+        }
+        set res [my searchButton $c $name]
+        if {$res ne ""} {return $res}
+    }
+    return
+}
+@ Class IDE::DBVCUtils {
+description {Warnig!
+
+This Test require XotclIDE installed in Version Control System
+The tests try to load and view IDECore Component}
+}
+Class IDE::DBVCUtils -superclass {::IDE::TestCase ::IDE::TkWindowControler}
+@ ::IDE::DBVCUtils idemeta component IDETests
+IDE::DBVCUtils instproc closeInfo {} {
+    update idletasks
+    set i [lindex [IDE::IDialogEntry info instances] 0]
+    my assert {$i ne ""}
+    my invokeButton Cancel $i 
+    update idletasks
+}
+IDE::DBVCUtils instproc endTest {} {
+   my instvar compBrowser
+   if {[Object isobject $compBrowser]} {
+       $compBrowser destroy
+   }
+}
+IDE::DBVCUtils instproc startTest {} {
+   return [IDE::System isDatabase]
+}
+IDE::DBVCUtils instproc testAASetComponentBrowser {} {
+   my set compBrowser [IDE::CompBrowser newBrowser]
+   my set win [[my set compBrowser] set win]
+}
+IDE::DBVCUtils instproc testBAviableApplications {} {
+   my invokeMenu Component {Version Control} Available
+   set browser [lindex [IDE::VersionBrowser info instances] 0]
+   my assert {$browser ne ""}
+   update idletasks
+   ${browser}::available setSelectedItem IDECore
+   update idletasks
+   ${browser}::version setSelectedIndex 0
+   update idletasks  
+   # Chek View Button (Edition Browser)
+   my invokeButton View $browser
+   set ebrowser [lindex [IDE::EditionBrowser info instances] 0]
+   my assert {$ebrowser ne ""}
+   update idletasks
+   ${ebrowser}::classes setSelectedItem IDE::Component
+   update idletasks
+   ${ebrowser}::methods setSelectedItem addClass
+   update idletasks
+   $ebrowser destroy
+
+   my invokeButton Cancel $browser
+   update idletasks
+}
+IDE::DBVCUtils instproc testCAviableClasses {} {
+   my instvar compBrowser
+   ${compBrowser}::appview setSelectedItem IDECore
+   my invokeMenu Class {Version Control} Available
+   set browser [lindex [IDE::VersionBrowser info instances] 0]
+   my assert {$browser ne ""}
+   update idletasks
+   ${browser}::available setSelectedItem IDE::Component
+   update idletasks
+   ${browser}::version setSelectedIndex 0
+   update idletasks
+
+   # Chek View Button (Edition Browser)
+   my invokeButton View $browser
+   set ebrowser [lindex [IDE::EditionBrowser info instances] 0]
+   my assert {$ebrowser ne ""}
+   update idletasks
+   ${ebrowser}::methods setSelectedItem addClass
+   update idletasks
+   $ebrowser destroy
+
+   my invokeButton Cancel $browser
+   update idletasks
+}
+IDE::DBVCUtils instproc testDComponentEdition {} {
+   set rows [IDE::ComponentPersistence getVersionsForName IDECore]
+   set id [lindex [lindex $rows 0] 0]
+   set obj [IDE::ComponentEdition new $id]
+
+   $obj printString 
+   my assert {[$obj getName] eq "IDECore"}
+   $obj setObjectsArray carr
+   my assert {[info exists carr(IDE::Component)]}
+   my assert {[ide::lcontain [$obj getObjectNames] IDE::Component]}
+   set eobj [$obj getObject IDE::Component]
+   my assert {$eobj ne ""}
+   
+   $eobj printString 
+   $eobj initMethodsArrays 
+   $eobj getInstanceMethodBody addClass
+   $eobj setInstanceMethodsArray marr
+   my assert {[info exists marr(addClass)]}
+   
+   my assert {[$eobj getName] eq "IDE::Component"}
+   $eobj getClassMethodBody loadPackage
+   $eobj setClassMethodsArray cmarr
+   my assert {[info exists cmarr(loadPackage)]}
+}
+IDE::DBVCUtils instproc testEClassInfo {} {
+   my instvar compBrowser
+   return
+   ${compBrowser}::appview setSelectedItem IDECore
+   ${compBrowser}::classview setSelectedItem IDE::Component
+   my invokeMenu Class {Version Control} Info
+   my closeInfo
+}
+IDE::DBVCUtils instproc testEComponentInfo {} {
+   my instvar compBrowser
+   return
+   ${compBrowser}::appview setSelectedItem IDECore
+   my invokeMenu Component {Version Control} Info
+   my closeInfo
+}
+IDE::DBVCUtils instproc testEMethodInfo {} {
+   my instvar compBrowser
+   return
+   ${compBrowser}::appview setSelectedItem IDECore
+   ${compBrowser}::classview setSelectedItem IDE::Component
+   ${compBrowser}::methodcatview setSelectedItem _all_categories
+   ${compBrowser}::methodview setSelectedItem addClass
+   my invokeMenu Method {Version Control} Info
+   my closeInfo
+}
+IDE::DBVCUtils instproc testFComponentRequirements {} {
+}
+IDE::DBVCUtils instproc testGVersionTreeClass {} {
+    my instvar compBrowser
+    ${compBrowser}::appview setSelectedItem IDECore
+    ${compBrowser}::classview setSelectedItem IDE::Component
+    my invokeMenu Class {Version Control} {Version Tree}
+    my closeWindowClass IDE::VersionTreeView
+}
+IDE::DBVCUtils instproc testGVersionTreeComponent {} {
+    my instvar compBrowser
+    ${compBrowser}::appview setSelectedItem IDECore
+    my invokeMenu Component {Version Control} {Version Tree}
+    my closeWindowClass IDE::VersionTreeView
+}
+IDE::DBVCUtils instproc testGVersionTreeMethod {} {
+    my instvar compBrowser
+    ${compBrowser}::appview setSelectedItem IDECore
+    ${compBrowser}::classview setSelectedItem IDE::Component
+    ${compBrowser}::methodcatview setSelectedItem _all_categories
+    ${compBrowser}::methodview setSelectedItem addClass
+    my invokeMenu Component {Version Control} {Version Tree}
+    my closeWindowClass IDE::VersionTreeView
+}
+Class IDE::EventsGUI -superclass ::IDE::TestCase
+@ ::IDE::EventsGUI idemeta component IDETests
+IDE::EventsGUI instproc testAHList {} {
+    toplevel .tlist
+    
+    ::destroy .tlist
+}
+Class IDE::ExampleTest -superclass ::IDE::TestCase
+@ ::IDE::ExampleTest idemeta component IDETests
+IDE::ExampleTest instproc testAName args {
+   my instvar a
+   set a test
+   set comp [IDE::Component getCompObjectForNameIfExist IDECore]
+   $comp getClasses
+   if {[Object isobject IDE::ExtendedDebugger]} {
+       atk::halt
+   } else {
+       my halt
+   }
+}
+IDE::ExampleTest instproc testBBreakpint args {
+   set a 4a
+   set b $a
+   set c [list $a $b]
+}
+Class IDE::SampleElements
+@ ::IDE::SampleElements idemeta component IDETests
+IDE::SampleElements instproc addSampleObjects obj {
+    namespace eval :: {
+         Class TestA
+         TestA instproc m1 {} { puts test }
+         TestA instproc m2 {} { puts test }
+         Class TestB -superclass TestA
+         TestB instproc m1 {} { puts test }
+         TestB instproc m2 {} { puts test }
+         Object TestC
+         TestC proc m1 {} { puts test }
+         TestC proc m2 {} { puts test }
+    }
+    set name [$obj getName]
+    TestB moveToComponent $name
+    TestA moveToComponent $name
+    TestC moveToComponent $name
+}
+IDE::SampleElements instproc addSampleObjectsComments cobj {
+    TestB setComment object
+    $cobj setComment component
+    TestB setMethodComment Instance m1 method
+}
+IDE::SampleElements instproc addSampleTclProcsGroup obj {
+    set tclgroup [$obj createTclProcsGroup testTclGroup 0]
+    $tclgroup handleScript {proc testProc {} {puts testProc}}
+    set tclgroup [$obj createTclProcsGroup testNamespace 1]
+    $tclgroup handleScript {proc testNamespace::testProc {} {puts testProc}}
+    return $tclgroup
+}
+IDE::SampleElements instproc addSampleTclProcsGroupComments obj {
+    set tclgroup [$obj getProcsGroupWithName testTclGroup]
+    $tclgroup setComment test_comment
+    $tclgroup setMethodComment dummy ::testProc test_comment
+}
+IDE::SampleElements instproc checkNoSampleObjects {} {
+    my assert {![Object isobject TestA]}
+    my assert {![Object isobject TestB]}
+    my assert {![Object isobject TestC]}
+}
+IDE::SampleElements instproc checkNoSampleTclProcsGroup {} {
+    my assert {[info proc ::testProc] eq ""}
+    my assert {[info proc ::testNamespace::testProc] eq ""}
+}
+IDE::SampleElements instproc checkSampleObjects compobj {
+    set classes [$compobj getClasses]
+    my assert {[ide::lcontain $classes TestA]}
+    my assert {[ide::lcontain $classes TestB]}
+    my assert {[ide::lcontain [$compobj getObjects] TestC]}
+    my assert {[Object isclass TestA]}
+    my assert {[Object isclass TestB]}
+    my assert {[Object isobject TestC]}
+    my assert {[TestB info superclass] eq "::TestA"}
+    set met [TestA info instprocs]
+    my assert {[ide::lcontain $met m1]}
+    my assert {[ide::lcontain $met m2]}
+    set met [TestB info instprocs]
+    my assert {[ide::lcontain $met m1]}
+    my assert {[ide::lcontain $met m2]}
+    set met [TestC info procs]
+    my assert {[ide::lcontain $met m1]}
+    my assert {[ide::lcontain $met m2]}
+}
+IDE::SampleElements instproc checkSampleObjectsComments cobj {
+    my assert {[TestB getComment] eq "object"}
+    my assert {[$cobj getComment] eq "component"}
+    my assert {[TestB getMethodComment Instance m1] eq "method"}
+
+    my assert {[TestB hasComment]}
+    my assert {[$cobj hasComment]}
+    my assert {[TestB hasMethodComment Instance m1]}
+}
+IDE::SampleElements instproc checkSampleTclProcsGroup obj {
+    set group [$obj getProcsGroupWithName testTclGroup]
+    my assert {$group ne ""}
+    my assert {![$group withNamespace]}
+    my assert {[lsearch [$group getProcsNames] testProc]>=0}
+    set pobj [$group getProcObjForNameIfExist testProc]
+    my assert {$pobj ne ""}
+    my assert {[$pobj getName] eq "testProc"}
+    my assert {[info proc ::testProc] ne ""}
+
+    set group [$obj getProcsGroupWithName testNamespace]
+    my assert {$group ne ""}
+    my assert {[$group withNamespace]}
+    my assert {[lsearch [$group getProcsNames] "testNamespace::testProc"]>=0}
+    set pobj [$group getProcObjForNameIfExist testNamespace::testProc]
+    my assert {$pobj ne ""}
+    my assert {[$pobj getName] eq "testNamespace::testProc"}
+
+    my assert {[info proc ::testNamespace::testProc] ne ""}
+}
+IDE::SampleElements instproc checkSampleTclProcsGroupComments obj {
+    set tclgroup [$obj getProcsGroupWithName testTclGroup]
+    my assert {[$tclgroup getComment] eq "test_comment"}
+    my assert {[$tclgroup getMethodComment dummy ::testProc] eq "test_comment"}
+}
+Class IDE::TComponentBrowser -superclass ::IDE::TestCase
+@ ::IDE::TComponentBrowser idemeta component IDETests
+IDE::TComponentBrowser instproc endTest {} {
+   my instvar obj
+   $obj destroy
+}
+IDE::TComponentBrowser instproc startTest {} {
+   my instvar obj
+   set obj [IDE::CompBrowser newBrowser]
+   update idletasks
+   return 1
+}
+IDE::TComponentBrowser instproc testCAview {} {
+   my instvar obj
+   ${obj}::appview selectItem IDECore
+   ${obj}::classview selectItem IDE::Component
+   ${obj}::methodcatview::stateButton setState Instance
+   update idletasks
+   ${obj}::methodcatview changeViewType Instance
+   ${obj}::methodcatview selectItem _all_categories
+   ${obj}::methodview selectItem addClass
+
+   ${obj}::methodcatview::stateButton setState Class
+   update idletasks
+   ${obj}::methodcatview changeViewType Class
+   ${obj}::methodcatview selectItem _all_categories
+   ${obj}::methodview selectItem getCompObjectForName
+
+   ${obj}::classview changeViewType Objects
+   ${obj}::classview selectItem IDE::IntroProxy
+   update idletasks
+   ${obj}::methodcatview changeViewType Class
+   ${obj}::methodcatview selectItem _all_categories
+   ${obj}::methodview selectItem getClasses
+   update idletasks
+   ${obj}::classview changeViewType "Procs"
+   update idletasks
+}
+Class IDE::TCore -superclass {::IDE::TestCase ::IDE::SampleElements}
+@ ::IDE::TCore idemeta component IDETests
+IDE::TCore instproc testAAPreCreate {} {
+    if {[ide::lcontain [IDE::Component getComponentNames] TestCase]} {
+        my stopTesting
+        error "TestCase should not exists"
+    }
+    if {[IDE::Component getCompObjectForNameIfExist TestCase] ne ""} {
+        my stopTesting
+        error "TestCase should not exists"
+    }
+    if {[ide::lcontain [IDE::IntroProxy getComponents] TestCase]} {
+        my stopTesting
+        error "TestCase should not exists"
+    }
+    if {[info procs ::testProc] ne ""} {
+        my stopTesting
+        error "proc testProc should not exists"
+    }
+    my checkNoSampleObjects
+    my checkNoSampleTclProcsGroup
+}
+IDE::TCore instproc testABCreate {} {
+    my instvar obj
+    set obj [IDE::Component getCompObjectForName TestCase]
+}
+IDE::TCore instproc testBName {} {
+    my instvar obj
+    if {[$obj getName] ne "TestCase"} { error {wrong name}}
+}
+IDE::TCore instproc testCAddObjects {} {
+    my instvar obj
+    my addSampleObjects $obj
+    my checkSampleObjects $obj
+    if {[$obj getObjects] ne "TestC"} {error "adding false1"}
+    if {![ide::lcontain [$obj getClasses] TestA]} {error "adding false2"}
+    if {![ide::lcontain [$obj getClasses] TestB]} {error "adding false3"}
+    if {[llength [$obj getClasses]]!=2} {error "adding false4"}
+}
+IDE::TCore instproc testCAddTclProcsGroup {} {
+    my instvar obj tclgroup
+
+    my addSampleTclProcsGroup $obj
+    my checkSampleTclProcsGroup $obj
+    set tclgroup [$obj getProcsGroupWithName testTclGroup]
+
+    # overwrite / redefine proc
+    set pobj [$tclgroup getProcObjForNameIfExist ::testProc]
+    $tclgroup handleScript {proc testProc {} {puts testProc2}}
+    my assert {[$tclgroup getProcObjForNameIfExist ::testProc]==$pobj}
+    my assert {[regexp testProc2 [$pobj getBody]]}
+    my assert {[llength [$tclgroup getProcsNames]]==1}
+    my assert {[info procs ::testProc] ne ""}
+}
+IDE::TCore instproc testDComments {} {
+    my instvar obj tclgroup
+    #[self] halt
+    my assert {[TestB getComment] eq ""}
+    my assert {[$obj getComment] eq ""}
+    my assert {[TestB getMethodComment Instance m1] eq ""}
+    
+    my assert {![TestB hasComment]}
+    my assert {![$obj hasComment]}
+    my assert {![TestB hasMethodComment Instance m1]}
+
+    my addSampleObjectsComments $obj
+
+    my checkSampleObjectsComments $obj
+    
+    my assert {[TestB hasComment]}
+    my assert {[$obj hasComment]}
+    my assert {[TestB hasMethodComment Instance m1]}
+    
+    # Tcl ProcGroups Comments Test
+    my assert {![$tclgroup hasComment]}
+    my assert {[$tclgroup getComment] eq ""}
+    
+    my addSampleTclProcsGroupComments $obj
+    my checkSampleTclProcsGroupComments $obj
+    
+    # comments remove
+
+    $tclgroup setComment {}
+    my assert {![$tclgroup hasComment]}
+    my assert {[$tclgroup getComment] eq ""}
+
+    $tclgroup setMethodComment dummy ::testProc {}
+    my assert {![$tclgroup hasMethodComment dummy ::testProc]}
+    my assert {[$tclgroup getMethodComment dummy ::testProc] eq ""}
+}
+IDE::TCore instproc testEAddCategories {} {
+   TestA moveToCategory m1 c1
+   TestA moveToCategory m2 c1
+   TestB moveToCategory m1 c2
+   TestB uncategoryFor m1
+   TestB moveToCategory m2 c2
+   TestB deleteCategory c2
+   TestB moveToCategory m1 c1
+   TestC moveToCategoryB m1 c1
+   TestC moveToCategoryB m2 c2
+}
+IDE::TCore instproc testEClassQuerring {} {
+   my instvar obj
+   if {[TestB getMethodsForCategory c1] ne "m1"} { error {category error1}} 
+   TestA getAllInstMethods
+   if {[TestA getCategories] eq ""}  { error {category error3}} 
+   if {[TestA getCategoryForMethod m1] ne "c1"}  { error {category error2}} 
+   if {[TestA getComponentName] ne "TestCase"} { error {component1}} 
+   if {[TestA getCompObject]!=$obj} { error {component2}} 
+
+   TestA getChildrenHierarchy 
+   TestB getHeritage 
+
+   TestB getAllFullInstMethods
+   if {[TestA getDeepChildren] eq ""} { error {herritage error3}}
+}
+IDE::TCore instproc testECompQuerring {} {
+    IDE::Component getObjectBody TestA
+}
+IDE::TCore instproc testEObjectQuerring {} {
+   my instvar obj
+
+   if {[TestC getCategoriesB] eq ""}  { error {category error1}} 
+   TestC printString
+   if {[TestC getComponentName] ne "TestCase"} { error {component1}} 
+   if {[TestC getCompObject]!=$obj} { error {component2}} 
+   TestC getSubobjectsHierarchy 
+   TestC metadataAsScript
+   TestC metadataAsScriptPur
+
+}
+IDE::TCore instproc testEProcsQuerring {} {
+   my instvar obj
+   set tclgroup [$obj getProcsGroupWithName testTclGroup]
+   my assert {[$tclgroup getDescription]==$tclgroup}
+   my assert {![$tclgroup isPersistent]}
+   my assert {[$tclgroup getComponentName] eq "TestCase"}
+   
+   set tclgroupNS [$obj getProcsGroupWithName testNamespace]
+   my assert {[$tclgroupNS withNamespace]}
+   
+   set pobj [$tclgroup getProcObjForNameIfExist ::testProc]
+   my assert {$pobj ne ""}
+   my assert {![$pobj isPersistent]}
+}
+IDE::TCore instproc testEProxyQuerring {} {
+    IDE::IntroProxy getBodyClassMethod TestC m1
+    IDE::IntroProxy getBodyInstanceMethod TestA m1
+    #IDE::IntroProxy getBodyMetadata TestA
+    IDE::IntroProxy getCategoriesForClass TestA
+    IDE::IntroProxy getCategoriesForObject TestC
+    IDE::IntroProxy getClassMethods TestA _all_categories
+    IDE::IntroProxy getClassMethods TestC _all_categories
+    IDE::IntroProxy getClasses
+    IDE::IntroProxy getClassesForComponent TestCase
+    IDE::IntroProxy getComponentsNoIDE
+    IDE::IntroProxy getInstanceMethods TestA _all_categories
+    IDE::IntroProxy getObjDef TestA
+    IDE::IntroProxy getObjects
+    IDE::IntroProxy getObjectsForComponent TestCase
+}
+IDE::TCore instproc testEQuerring {} {
+    my instvar obj
+    if {[$obj getObjectDefineList] eq ""} { error "no define list"}
+    $obj getRequiredFor
+    $obj getRequiredFrom
+    if {[$obj getVersionNumber] ne "0.1"} { error "false version number"}
+    $obj getVisibleClasses
+    if {[$obj isPersistent]} { error "should be not persistant"}
+    $obj asScript
+    $obj getClassesHierarchy
+    $obj computeRequirements
+    $obj getRequiredFromDeep
+    $obj standardFileName
+    $obj standardFileNameBase
+}
+IDE::TCore instproc testFAManipulateTclProcs {} {
+    my instvar obj tclgroup
+    # changing definitions script
+    set tclgroupNS [$obj getProcsGroupWithName testNamespace]
+    set defBody {
+        namespace eval ::testNamespace {variable myvar 12}
+    }
+    my assert {[$tclgroupNS withNamespace]}
+    $tclgroupNS handleDefinitionScript $defBody
+    #my assert {[$tclgroupNS getDefBody] ne ""}
+
+    # deleting proc
+    $tclgroup handleScript {proc testProc2 {} {puts testProc}}
+    my assert {[$tclgroup getProcObjForNameIfExist testProc2] ne ""}
+    my assert {[lsearch [$tclgroup getProcsNames] testProc2]!=-1}
+    my assert {[info procs ::testProc2] ne ""}
+    $tclgroup deleteMethod testProc2
+    my assert {[$tclgroup getProcObjForNameIfExist testProc2] eq ""}
+    my assert {[lsearch [$tclgroup getProcsNames] testProc2]<0}
+    my assert {[info procs ::testProc2] eq ""}
+}
+IDE::TCore instproc testFBManipulateTclProcs {} {
+    my instvar obj
+    # deleting proc group
+    set group [$obj createTclProcsGroup testTclGroup2 0]
+    $group handleScript {proc testProc2 {} {puts testProc}}
+    my assert {[info procs ::testProc2] ne ""}
+    $obj removeProcsGroup $group
+    my assert {[$obj getProcsGroupWithName testTclGroup2] eq ""}
+    my assert {[info procs ::testProc2] eq ""}
+    # rename tcl proc group
+    set group [$obj getProcsGroupWithName testTclGroup]
+    my assert {$group ne ""}
+    $group rename testTclGroupBis
+    my assert {[$group getObjectName] eq "testTclGroupBis"}
+    $group rename testTclGroup
+    my assert {[$group getObjectName] eq "testTclGroup"}
+}
+IDE::TCore instproc testGCopyClass {} {
+    my instvar obj
+    $obj copyClassOrObject TestA TestACopy
+    my assert {[Object isclass TestACopy]}
+    set met [TestACopy info instprocs]
+    my assert {[ide::lcontain $met m1]}
+    my assert {[ide::lcontain $met m2]}
+}
+IDE::TCore instproc testHMoveClass {} {
+    my instvar obj mcobj
+    set mcobj [IDE::Component getCompObjectForName TestCase2]
+    namespace eval :: {
+         Class TestD
+         TestA instproc dm1 {} { puts dm1_test }
+         TestA instproc dm2 {} { puts dm2_test }
+    }
+    set group [$mcobj createTclProcsGroup testTclGroup3 0]
+    $group handleScript {proc testProcM2 {} {puts testProc}}
+    
+    my assert {[$mcobj getProcsGroupWithName testTclGroup3]==$group}
+    $group moveToComponent TestCase
+    my assert {[set group [$obj getProcsGroupWithName testTclGroup3]] ne ""}
+    my assert {[$group getComponent]==$obj}
+    my assert {[$mcobj getProcsGroupWithName testTclGroup3] eq ""}
+    
+    
+    TestD moveToComponent TestCase
+    my assert {[TestD getComponentName] eq "TestCase"}
+    my assert {[TestD getCompObject]==$obj}
+    
+    TestD moveToComponent TestCase2
+    my assert {[TestD getComponentName] eq "TestCase2"}
+    my assert {[TestD getCompObject]==$mcobj}
+    my assert {[ide::lcontain [$mcobj getClasses] TestD]}
+    my assert {![ide::lcontain [$obj getClasses] TestD]}
+}
+IDE::TCore instproc testIRemoveObjects {} {
+    my instvar obj
+    $obj removeClass TestA
+    if {[ide::lcontain [$obj getClasses] TestA]} {error "removing false"}
+    if {![ide::lcontain [$obj getClasses] TestB]} {error "removing false"}
+    $obj removeObject TestC
+    if {[ide::lcontain [$obj getObjects] TestC]} {error "removing false"}
+    $obj removeClass TestB
+    if {[ide::lcontain [$obj getClasses] TestB]} {error "removing false"}
+    TestA destroy
+    TestB destroy
+    TestC destroy
+    IDE::CommentsContainer destroyObject ::TestB
+}
+IDE::TCore instproc testKQuerring {} {
+    my instvar obj
+    $obj getObjectDefineList
+    $obj getRequiredFor
+    $obj getRequiredFrom
+    if {[$obj getVersionNumber] ne "0.1"} { error "false version number"}
+    $obj getVisibleClasses
+    if {[$obj isPersistent]} { error "should be not persistant"}
+    $obj asScript
+}
+IDE::TCore instproc testLRenomeComp {} {
+    my instvar obj
+    $obj rename TestCaseN
+    my assert {[$obj getName] eq "TestCaseN"}
+    my assert {[IDE::Component getCompObjectForNameIfExist TestCase] eq ""}
+    my assert {[IDE::Component getCompObjectForNameIfExist TestCaseN] eq $obj}
+}
+IDE::TCore instproc testZZDestroy {} {
+    my instvar obj mcobj
+    $obj unload
+    $mcobj unload
+    my testAAPreCreate
+}
+Class IDE::TDevelopUtils -superclass ::IDE::TestCase
+@ ::IDE::TDevelopUtils idemeta component IDETests
+IDE::TDevelopUtils instproc testASearch args {
+   IDE::MethodBrowser searchSendersAll testASearch
+   IDE::MethodBrowser searchTextAll mySpecialText23
+   IDE::MethodBrowser searchTextComponent mySpecialText23 IDETests
+   IDE::MethodBrowser searchImplementorsAll testASearch 1
+   IDE::MethodBrowser searchImplementorsComponent testASearch IDETests
+   IDE::MethodBrowser searchTextClass testASearch IDE::TDevelopUtils
+   IDE::MethodBrowser searchImplementorsClass testASearch IDE::TDevelopUtils
+ 
+   IDE::MethodBrowser searchImplementorsAll testASearch 1
+   IDE::MethodBrowser searchImplementorsComponent testASearch IDETests
+   IDE::MethodBrowser searchImplementorsClass testASearch IDE::TDevelopUtils
+
+   update idletasks
+   foreach obj [IDE::MethodBrowser info instances] {
+      $obj destroy 
+      update idletasks
+   }
+}
+IDE::TDevelopUtils instproc testBSearchProc args {
+
+   IDE::MethodBrowser searchImplementorsAll testFindMethodUUHA 1
+   IDE::MethodBrowser searchImplementorsComponent testFindMethodUUHA IDETests
+   IDE::MethodBrowser searchImplementorsClass testFindMethodUUHA IDE::TDevelopUtils
+   IDE::MethodBrowser searchTextAll RybnikNowiny
+   IDE::MethodBrowser searchTextComponent RybnikNowiny IDETests
+   IDE::MethodBrowser searchTextClass RybnikNowiny IDE::TDevelopUtils
+
+   my assert {[IDE::MethodSelector getMethodsForPattern testBSearchProc] ne ""}
+   my assert {[IDE::MethodSelector getMethodsForPattern testFindMethodUUHA] ne ""}
+   
+   update idletasks
+   foreach obj [IDE::MethodBrowser info instances] {
+      $obj destroy 
+      update idletasks
+   }
+}
+IDE::TDevelopUtils proc testFindMethodUUHA {} {
+  # only for checking if XOTclIDE can find that method RybnikNowiny
+}
+Class IDE::TEventHandling -superclass ::IDE::TestCase
+@ ::IDE::TEventHandling idemeta component IDETests
+IDE::TEventHandling instproc endTest {} {
+    # no syntax check
+    ta destroy
+    tb destroy
+}
+IDE::TEventHandling instproc startTest {} {
+    Object isobject IDE::EventHandlerMix
+}
+IDE::TEventHandling instproc testAFSimple {} {
+    # no syntax check
+    Object ta -mixin IDE::EventHandlerMix
+    Object tb -mixin IDE::EventHandlerMix
+    ta proc sensor {t1} {my set t1 $t1}
+    ta proc sensor2 {} {my set t2 1}
+    ta proc sensor3 {a b} {my set t3 $a; my set t4 $b}
+    tb addEventInteres ta sensor event1
+    tb addEventInteres ta sensor2 event2
+    tb addEventInteres ta sensor3 event3 par1
+    tb addEventInteres ta sensor event4 par4
+    tb signalEvent event1 parValue1
+    tb signalEvent event2
+    tb signalEvent event3 par2
+    my assert {[ta set t1] eq "parValue1"}
+    my assert {[ta set t2]==1}
+    my assert {[ta set t3] eq "par1"}
+    my assert {[ta set t4] eq "par2"}
+    tb signalEvent event4
+    my assert {[ta set t1] eq "par4"}
+}
+IDE::TEventHandling instproc testBFRemoveInteres {} {
+    # no syntax check
+    ta set t1 dummy
+    tb removeInterestFrom ta
+    tb signalEvent event4
+    my assert {[ta set t1] eq "dummy"}
+}
+Class IDE::TImportingSource -superclass {::IDE::TestCase ::IDE::SampleElements}
+@ ::IDE::TImportingSource idemeta component IDETests
+IDE::TImportingSource instproc endTest {} {
+   file delete [my getFileName]
+   set cobj [IDE::Component getCompObjectForNameIfExist TestCase]
+   if {$cobj ne ""} {$cobj unload}
+}
+IDE::TImportingSource instproc getFileName {} {
+    return TestCase.xotcl
+}
+IDE::TImportingSource instproc testAMakeSampleFile {} {
+    set file [open [my getFileName] w]
+    puts $file {
+        Class TestA
+        TestA instproc m1 {} { puts test }
+        TestA instproc m2 {} { puts test }
+        Class TestB -superclass TestA
+        TestB instproc m1 {} { puts test }
+        TestB instproc m2 {} { puts test }
+        Object TestC
+        TestC proc m1 {} { puts test }
+        TestC proc m2 {} { puts test }
+        proc testProc {} {puts testProc}
+        Class MetaTestClass -superclass Class
+        MetaTestClass MTest
+        MTest instproc m3 {} { puts mctest }
+    }
+    close $file
+}
+IDE::TImportingSource instproc testFImportSource {} {
+    my instvar cobj
+    IDE::Component importCompsFromFile [my getFileName]
+    set cobj [IDE::Component getCompObjectForNameIfExist TestCase]
+    my assert {$cobj ne ""}
+    my checkSampleObjects $cobj
+
+    set classes [$cobj getClasses]
+    my assert {[ide::lcontain $classes MetaTestClass]}
+    my assert {[ide::lcontain $classes MTest]}
+
+    set group [$cobj getProcsGroupWithName default]
+    my assert {$group ne ""}
+    my assert {![$group withNamespace]}
+    my assert {[lsearch [$group getProcsNames] "testProc"]>=0}
+    my assert {[info proc ::testProc] ne ""}
+}
+Class IDE::TObjectBrowser -superclass ::IDE::TestCase
+@ ::IDE::TObjectBrowser idemeta component IDETests
+IDE::TObjectBrowser instproc testABuildObject {} {
+    Class TOBExample 
+    TOBExample instproc foo {} {
+       puts foo
+    }
+    TOBExample instproc foo2 {} {
+       puts foo2
+    }
+    TOBExample tobExample
+    TOBExample tobExample::subObject
+    tobExample set varFoo test
+}
+IDE::TObjectBrowser instproc testBTestObject {} {
+    if {![Object isclass TOBExample] ||
+         ![Object isobject tobExample]} {
+        my stopTesting
+        error "Test Object not exists"
+    }
+}
+IDE::TObjectBrowser instproc testCBrowser {} {
+   my instvar obj
+   set obj [tobExample inspect]
+   update idletasks
+}
+IDE::TObjectBrowser instproc testDBrowserFunc {} {
+   my instvar obj
+   ${obj}::varsview selectItem varFoo
+   ${obj}::subobjectsview selectItem subObject
+   ${obj}::methodview selectItem foo
+   update idletasks
+}
+IDE::TObjectBrowser instproc testWBrowser {} {
+   my instvar obj
+   $obj destroy
+}
+IDE::TObjectBrowser instproc testZResetObject {} {
+    tobExample destroy
+    TOBExample destroy
+}
+Class IDE::TParser -superclass ::IDE::TestCase
+@ ::IDE::TParser idemeta component IDETests
+IDE::TParser instproc endTest {} {
+   TestA destroy
+}
+IDE::TParser instproc testAStream {} {
+    set sample {abcdeftghijk}
+    set obj [ReadStringStream new -volatile -string $sample]
+    my assert {![$obj atEnd]}
+    my assert {[$obj getChar] eq "a"}
+    my assert {[$obj pos]==0}
+    my assert {[$obj nextChar] eq "a"}
+    my assert {[$obj getChar] eq "b"}
+    my assert {[$obj pos]==1}
+    $obj addPos 2
+    my assert {[$obj getChar] eq "d"}
+    $obj addPos -2
+    my assert {[$obj getChar] eq "b"}
+    my assert {[$obj pos]==1}
+    my assert {![$obj atEnd]}
+    $obj pos 0
+    set x 0
+    while {![$obj atEnd]} {
+        my assert {[$obj nextChar]==[string index $sample $x]}
+        incr x
+        my assert {[$obj pos]==$x}
+    }
+    my assert {[string length $sample]==$x}
+    my assert {[$obj copyFromTo 0 1] eq "ab"}
+}
+IDE::TParser instproc testBBasePrs {} {
+    set sample { abc "efg" [hij] {klm} }
+    set stream [ReadStringStream new -childof [self] -string $sample]
+    set prs [TclParser new -childof [self] -stream $stream]
+    my assert {[$stream getChar] eq " "}
+    $prs skipBlanks
+    my assert {[$stream getChar] eq "a"}
+    $prs skipToWordEnd
+    my assert {[$stream getChar] eq " "}
+    $prs skipCharacters "\t "
+    my assert {[$stream getChar] eq "\""}
+    $prs destroy
+    $stream destroy
+}
+IDE::TParser instproc testCSimple {} {
+    set sample {
+        proc1 arg1 arg2; proc2 arg2
+        # hier is my comment
+        proc3 "rrr rerwer" $variable
+        proc4 {ewewewewe ewew weqweq}
+    }
+    set obj [ReadStringStream new -childof [self] -string $sample]
+    set prs [TclParser new -childof [self] -stream $obj]
+    $prs root [PrsNoSubst new -childof [$prs]]
+    $prs parseScriptTo [$prs root]
+    set script [$prs root] 
+    my assert {[$script info class] eq "::PrsNoSubst"}
+    my assert {[llength [$script list]]==5}
+    my assert {[[lindex [$script list] 0] info class] eq "::PrsCommand"}
+    my assert {[[lindex [$script list] 2] info class] eq "::PrsComment"}
+
+    set com [lindex [$script list] 0]
+    my assert {[llength [$com list]]==3}
+    my assert {[[lindex [$com list] 0] info class] eq "::PrsLiteral"}
+    my assert {[[lindex [$com list] 0] begin]==9}
+    my assert {[[lindex [$com list] 0] end]==13}
+    my assert {[[lindex [$com list] 0] prsString] eq "proc1"}
+
+    set com [lindex [$script list] 3]
+    my assert {[llength [$com list]]==3}
+    my assert {[[lindex [$com list] 1] info class] eq "::PrsQuoted"}
+    my assert {[[lindex [$com list] 1] begin]==81}
+    my assert {[[lindex [$com list] 1] end]==90}
+    my assert {[[lindex [$com list] 1] prsString] eq "rrr rerwer"}
+    my assert {[[lindex [$com list] 2] info class] eq "::PrsVariable"}
+    my assert {[[lindex [$com list] 2] begin]==94}
+    my assert {[[lindex [$com list] 2] end]==101}
+    my assert {[[lindex [$com list] 2] prsString] eq "variable"}
+    
+    set com [lindex [$script list] 4]
+    my assert {[llength [$com list]]==2}
+    my assert {[[lindex [$com list] 1] info class] eq "::PrsNoSubst"}
+    my assert {[[lindex [$com list] 1] begin]==118}
+    my assert {[[lindex [$com list] 1] end]==138}
+    my assert {[[lindex [$com list] 1] prsString] eq "ewewewewe ewew weqweq"}
+    
+    $prs destroy
+    $obj destroy
+}
+IDE::TParser instproc testDDefObject {} {
+    namespace eval :: {
+         Class TestA
+         TestA instproc m1 {a} { puts test }
+         TestA instproc m2 {} { puts test }
+         TestA instproc m3 {a b {c 1}} { puts test }
+         TestA instproc m4 {args} { puts test }
+    }
+}
+IDE::TParser instproc testECheckInstproc {} {
+    # check ease method call and arguments counts
+    set script {TestA instproc t1 {a b} {
+            puts test
+            puta $d
+            my m1 $a
+            my unknownMethod $a $b
+            $a nocheck
+            my m1 1 2
+            # comment
+            my m1
+            # this should not produce errors
+            my m3 1 2 3
+            my m3 1 2
+            my m4 1
+            my m4
+            my m4 1 2
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    # await some errors
+    my assert {[$context set isInstproc]}
+    my assert {![$context set isTclproc]}
+    my assert {[$context set name] eq "t1"}
+    my assert {[$context hasErrors]}
+    my assert {[llength [$context errors]]==5}
+    my assert {[regexp proc [lindex [$context errors] 0]]}
+    my assert {[regexp variable [lindex [$context errors] 1]]}
+    my assert {[regexp instproc [lindex [$context errors] 2]]}
+    my assert {[regexp arguments [lindex [$context errors] 3]]}
+    my assert {[regexp arguments [lindex [$context errors] 4]]}
+    $context destroy
+}
+IDE::TParser instproc testFCheck {} {
+    # check defining of local varibles evaluating of scripts in command
+    set script {TestA instproc t1 {a b} {
+            set c d
+            puts $c
+            foreach d $a {
+                my unknownMethod $a $b
+            }
+            my set e g
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {[llength [$context variables]]==4}
+    my assert {[$context hasErrors]}
+    my assert {[llength [$context errors]]==1}
+    my assert {[regexp instproc [$context errors]]}
+}
+IDE::TParser instproc testGComplexExpr {} {
+    # check defining of local varibles evaluating of scripts in command
+    set script {TestA instproc t1 {a b} {
+            set c "$a were [set k 2]"
+            puts "c$c"
+            ${a}::test test
+            puts ewrr$a
+            puts wqwr[self]
+            [self]::subobjec set ${c}
+            set e $c.teststring
+            foreach d $a {
+                my m1 ${k}
+            }
+            for {set m 0} {$m<10} {incr m} {
+                puts $m
+            }
+            set a
+            my set e g[set k]
+            set a $a[set a]
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    [[$context parser] root] visit [self]
+    my assert {[llength [$context variables]]==7}
+    my assert {![$context hasErrors]}
+}
+IDE::TParser instproc testHParsingErrors {} {
+    # check parsing errors
+    set script {TestA instproc t1 {a b} {
+            puts [test
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {[[$context parser] hasParseErrors]}
+    
+    set script {TestA instproc t1 {a b} {
+            puts "test
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {[[$context parser] hasParseErrors]}
+       
+    set script {TestA instproc t1 {a b} {
+            if {[ew} {puts yee}
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {[[$context parser] hasParseErrors]}
+
+    set script {TestA instproc t1 {a b} {
+            puts "[ewre"
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {[[$context parser] hasParseErrors]}
+
+}
+IDE::TParser instproc testIMaskingCharParsing {} {
+    # check parsing errors
+    set script {TestA instproc t1 {a b} {
+        puts ewewe\ atr
+        puts {ewr\}}
+        puts \{ewre
+        puts "\""
+        puts "\["
+        puts \[\ \]
+    }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    foreach elem [[[$context parser] root] list] {
+        my assert {[$elem info class] eq "::PrsCommand"}
+        my assert {[$elem argsCount]==1}
+    }
+}
+IDE::TParser instproc testJProc {} {
+    # check parsing errors
+    set script {proc testproc {a b} {
+        puts ewewe
+    }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {[$context set name] eq "testproc"}
+    my assert {[$context set isTclproc]}
+    my assert {![$context hasErrors]}
+    
+}
+IDE::TParser instproc testKComplexCommand {} {
+   # check for foreach regexp ans switch parsing/evaluating
+   set script {TestA instproc t1 {a b} {
+            regexp -- {[ab]+} {abder} a b c
+            set a; set b
+            for {set x 1} {$x<3} {incr x} {
+                set d 0
+            }
+            set d; set x;
+            foreach e {a b c} f {g h i} {
+                puts "$e $f"
+            }
+            set e; set f
+            foreach i {a b c} {
+                puts $i
+            }
+            set i
+            foreach {j k} {a b c} {
+                puts "$j $k"
+            }
+            set j; set k
+            switch $j {
+                a { set m 0}
+                b { set m 0}
+            }
+            set m
+            upvar $a ad $b ae
+            set ad; set ae;
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {![$context hasErrors]}
+}
+IDE::TParser instproc testLArrays {} {
+   # check for array parsing
+   set script {TestA instproc t1 {a b} {
+            set a(1) b
+            puts $a(3)
+            set b 1
+            puts $a($b)
+            puts $a(abc.[my set b])
+            puts $a([my set b])m
+            puts www$a(2)
+            puts $a(2)www
+            set d(3) 2
+            puts $d(3)
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {![$context hasErrors]}
+    
+    set script {TestA instproc t1 {a b} {
+            puts $a([my noSuchProc])
+            puts $a($c)
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {[$context hasErrors]}
+    my assert {[llength [$context errors]]==2}
+}
+IDE::TParser instproc testMSpecialStrings {} {
+    set script {TestA instproc t1 {a b} {
+            # no syntax check
+            nonsense 1
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {![$context hasErrors]}
+    
+    set script {TestA instproc t1 {a b} {
+            # add variables (c d)
+            puts "$c $d"
+            }}
+    set context [PrsContext new -childof [self]]
+    $context parseAndCheck $script
+    my assert {![$context hasErrors]}
+}
+IDE::TParser instproc visit prsElem {
+    my assert {[$prsElem exists begin] && [$prsElem exists end]}
+}
+Class IDE::TPersistence -superclass {::IDE::TestCase ::IDE::SampleElements}
+@ ::IDE::TPersistence idemeta component IDETests
+IDE::TPersistence instproc startTest {} {
+    return [IDE::System isDatabase]
+}
+IDE::TPersistence instproc testBAUserQuery {} {
+   IDE::User getSystemUser
+   IDE::User getDefault
+   if {[IDE::User getDefaultUserId]!=[IDE::System getUserId]} {
+        error {wrong user id}
+   }
+   
+}
+IDE::TPersistence instproc testBBComponentQuery {} {
+   # Querring the VC-DB. Ask von components and available version    
+   set anames [IDE::ComponentPersistence getAvailable]
+   set cname [lindex $anames [expr round(rand() * ([llength $anames]-1))]]
+   set versions [IDE::ComponentPersistence getVersionsForName $cname]
+   set version [lindex $versions [expr round(rand() * ([llength $versions]-1))]]
+   set versionId [lindex $version 0]
+   IDE::ComponentPersistence getAdditionalInfo $versionId
+   IDE::ComponentPersistence readRequiredForId $versionId
+}
+IDE::TPersistence instproc testBCClassQuery {} {
+   # Querring the VC-DB. Ask von classes and available version
+   set anames [IDE::ObjectDescription getAvailable]
+   set cname [lindex $anames [expr round(rand() * ([llength $anames]-1))]]
+   set versions [IDE::ObjectDescription getVersionsForName $cname]
+   set version [lindex $versions [expr round(rand() * ([llength $versions]-1))]]
+   set versionId [lindex $version 0]
+   IDE::ObjectDescription getAdditionalInfo $versionId
+}
+IDE::TPersistence instproc testBDRowCountsQuery {} {
+    my instvar countComponent countComponentObject countObject countObjectMethod countMethod countInfo
+    if {[[IDE::DBPersistence getConnection] istype XOMetakit]} {
+        return
+    }
+
+    set query "SELECT count(*) from Component"
+    set countComponent [lindex [IDE::DBPersistence queryAsList $query] 0]
+
+    set query "SELECT count(*) from ComponentObject"
+    set countComponentObject [lindex [IDE::DBPersistence queryAsList $query] 0]
+
+    set query "SELECT count(*) from Object"
+    set countObject [lindex [IDE::DBPersistence queryAsList $query] 0]
+
+    set query "SELECT count(*) from ObjectMethod"
+    set countObjectMethod [lindex [IDE::DBPersistence queryAsList $query] 0]
+
+    set query "SELECT count(*) from Method"
+    set countMethod [lindex [IDE::DBPersistence queryAsList $query] 0]
+
+    set query "SELECT count(*) from Info"
+    set countInfo [lindex [IDE::DBPersistence queryAsList $query] 0]
+}
+IDE::TPersistence instproc testEAComponentImport {} {
+    my instvar compObj
+    set compObj [IDE::Component getCompObjectForName TestCase]
+    my addSampleObjects $compObj
+    my addSampleTclProcsGroup $compObj
+    
+    IDE::ComponentPersistence importComponent [$compObj getName]
+}
+IDE::TPersistence instproc testEBComents {} {
+    my instvar compObj
+    TestB getComment
+    $compObj getComment
+    TestB getMethodComment Instance m1
+    
+    my assert {![TestB hasComment]}
+    my assert {![$compObj hasComment]}
+    my assert {![TestB hasMethodComment Instance m1]}
+
+    my addSampleObjectsComments $compObj
+
+    my checkSampleObjectsComments $compObj
+}
+IDE::TPersistence instproc testECCompPQuerry {} {
+    my instvar compObj compId compObjArr
+    if {![$compObj isPersistent]} { 
+        my stopTesting
+        error {should be presistent}
+    }
+   if {[$compObj getName] ne "TestCase"} { error "wrong name"}
+   $compObj getVersionNumber 
+   $compObj getObject TestA
+   $compObj printString 
+   $compObj getDescriptor 
+   $compObj setObjectsArray compObjArr
+   $compObj questForChangeParent 
+   if {[IDE::ComponentPersistence getVersionsForName TestCase] eq ""} {
+        error "wrong import"
+   }
+   # IDE::DBPersistence Methods
+   set compId [$compObj getIdValue]
+   $compObj setMaxIdForMyName 
+   $compObj getVersionString 
+   $compObj isclosed 
+   $compObj getDescriptor 
+   $compObj getUserId 
+
+   return
+   $compObj addObject compObj
+   $compObj updateInsert args
+   $compObj rereadForAnotherVersion componentId
+   $compObj updateVersion 
+   $compObj versionEdition 
+   $compObj updateRequired 
+   $compObj registerObject compObj
+   $compObj removeClass compObj
+   $compObj synchronizeWithDB 
+   $compObj importAllObjects 
+   $compObj setRequirements reqlist
+   $compObj initForPersistence 
+   $compObj loadAllObjects 
+   $compObj reorderObjectDefinition 
+   $compObj removeObject compObj
+   $compObj installObject compObj
+   $compObj checkRequirementsForClass class
+   $compObj addClass compObj
+   $compObj loadObject compObjectid
+   $compObj questForChange 
+   $compObj readRequiredFromDB 
+}
+IDE::TPersistence instproc testEDObjectPQuerry {} {
+    my instvar compObj compId methodArr compObjArr
+    set descr [$compObj getObject TestA]
+    
+    $descr printString 
+    $descr getDescriptor 
+    $descr getVersionString 
+    $descr getUserId 
+
+    if {[$descr getObjectName] ne "TestA"} { error {wrong name}}
+    if {$compObjArr(TestA)!=[$descr getIdValue]} error
+    $descr setInstanceMethodsArray methodArr
+
+    if {![$descr isTrackingOn]} { error "shoul be 1"}
+    $descr getMetadataText 
+    $descr setClassMethodsArray arr_ref
+    if {[$descr getComponentId]!=$compId} { error {wrong compid}}
+    $descr getObject 
+    $descr getName 
+    $descr getClassMethodIfExist name
+    if {[$descr getType] ne "Class"} { error {wrong type}}
+    $descr printString
+    #[self] halt 
+    if {[$descr getComponent]!=$compObj} { error {wrom compObj}}
+    $descr getDescriptor 
+    $descr getDefBody 
+    $descr getMethodDescriptions
+    #[self] halt
+}
+IDE::TPersistence instproc testEEMethodPQuerry {} {
+    my instvar compObj compId methodArr
+    set descr [$compObj getObject TestA]
+    set obj [$descr getInstanceMethod m1]
+    
+    $obj printString 
+    $obj getDescriptor 
+    $obj getVersionString 
+    $obj getUserId 
+    $obj getName 
+
+    if {[$descr getMethodId m1]!=[$obj getIdValue]} error
+    if {$methodArr(m1)!=[$obj getIdValue]} error
+    if {[$obj getObjectId]!=[$descr getIdValue]} error
+
+    $obj getCategory 
+    $obj getDescriptor 
+    if {[$obj getObjectName]!="TestA"} error
+    $obj printString 
+}
+IDE::TPersistence instproc testFAAddObjects {} {
+    my instvar compObj
+    namespace eval :: {
+         Class TestD
+         TestD instproc m1 {} { puts test }
+         TestD instproc m2 {} { puts test }
+    }
+    TestD moveToComponent TestCase
+    my assert {[ide::lcontain [$compObj getClasses] TestD]}
+}
+IDE::TPersistence instproc testFDredefineObjects {} {
+    my instvar compObj
+    namespace eval :: {
+         TestA superclass TestD
+    }
+    if {[[$compObj getObject TestA] set deforder]<[[$compObj getObject TestD] set deforder]} error
+
+}
+IDE::TPersistence instproc testFFaddMethod {} {
+    my instvar compObj
+    namespace eval :: {
+         TestA instproc m3 {} {
+             puts yee
+         }
+    }
+    my assert {[[$compObj getObject TestA] getInstanceMethodIfExist m3] ne ""}
+}
+IDE::TPersistence instproc testFFmodifyMethod {} {
+    my instvar compObj methodArr
+    namespace eval :: {
+         TestA instproc m1 {} {
+             puts modified
+         }
+    }
+    set mobj [[$compObj getObject TestA] getInstanceMethodIfExist m1]
+    if {$methodArr(m1)==[$mobj getIdValue]} {error "m1 should have new id"}
+    if {$methodArr(m1)!=[$mobj set basedon]} {error "old id should be based on"}
+}
+IDE::TPersistence instproc testFHloadPrevMethod {} {
+    my instvar compObj methodArr
+    set mobj [[$compObj getObject TestA] getInstanceMethodIfExist m1]
+    $mobj loadPrevious
+    if {$methodArr(m1)!=[$mobj getIdValue]} { error "m1 should have old id"}
+    if {[$mobj set basedon] ne "" && [$mobj set basedon]!=0} { error "based on should be  null"}
+}
+IDE::TPersistence instproc testFIARereadForObject {} {
+    # test versioning and loading versions of objects
+    my instvar compObj
+    set mobj [$compObj getObject TestA]
+    set oldid [$mobj set objectid]
+    $mobj versionEdition
+    $mobj createNewEdition
+    set newid [$mobj set objectid]
+    my assert {$newid!=$oldid}
+    my assert {[$mobj set basedon]==$oldid}
+    namespace eval :: {
+         # modify method
+         TestA instproc m1 {} {
+             puts modified2
+         }
+         # new method
+         TestA instproc m4 {} {
+             puts modified2
+         }
+         # delete method
+         TestA instproc m2 {} {}
+         TestA parameter testParam
+    }
+
+    $mobj changeVersionTo $oldid
+    my assert {$oldid==[$mobj set objectid]}
+
+    my assert {[TestA info instprocs m2] ne ""}
+    my assert {[TestA info instprocs m4] eq ""}
+    my assert {![regexp modified2 [TestA info instbody m1]]}
+    my assert {[TestA info parameter] eq ""}
+}
+IDE::TPersistence instproc testFIBRereadForTclGroup {} {
+    # test versioning and loading versions of tcl groups
+    my instvar compObj
+    set tclgroup [$compObj getProcsGroupWithName testTclGroup]
+    set oldid [$tclgroup set objectid]
+    $tclgroup versionEdition
+    $tclgroup createNewEdition
+    set newid [$tclgroup set objectid]
+    my assert {$newid!=$oldid}
+
+    $tclgroup handleScript {proc testProc {} {puts testProc2}}
+    $tclgroup handleScript {proc testProc2 {} {puts testProc}}
+
+    $tclgroup changeVersionTo $oldid
+    my assert {$oldid==[$tclgroup set objectid]}
+
+    my assert {[info procs testProc2] eq ""}
+    my assert {![regexp modified2 testProc2 [info procs body]]}
+    
+}
+IDE::TPersistence instproc testFMComponent2 {} {
+    my instvar compObj2 compObj
+    
+    set compObj2 [IDE::Component getCompObjectForName TestCase2]
+    IDE::ComponentPersistence importComponent [$compObj2 getName]
+   
+    namespace eval :: {
+         Class TestM
+         TestM instproc md1 {} { puts test }
+         TestM instproc md2 {} { puts test }
+    }
+    TestM moveToComponent TestCase 
+    my assert {[ide::lcontain [$compObj getClasses] TestM]}
+    my assert {[TestM getComponentName] eq "TestCase"}
+    
+    # Move Class to another persistent Component
+    
+    TestM moveToComponent TestCase2
+    my assert {![ide::lcontain [$compObj getClasses] TestM]}
+    my assert {[ide::lcontain [$compObj2 getClasses] TestM]}
+    my assert {[TestM getComponentName] eq "TestCase2"}
+    
+    $compObj2 copyClassOrObject TestM TestMCopy
+    my assert {[ide::lcontain [$compObj2 getClasses] TestMCopy]}
+    my assert {[TestMCopy getComponentName] eq "TestCase2"}
+    
+    set met [TestMCopy info instprocs]
+    my assert {[ide::lcontain $met md1]}
+    my assert {[ide::lcontain $met md2]} 
+}
+IDE::TPersistence instproc testGAversionAll {} {
+    my instvar compObj methodArr
+    foreach obj [$compObj getClasses] {
+          [$compObj getObject $obj] versionEdition
+    }
+    foreach obj [$compObj getObjects] {
+          [$compObj getObject $obj] versionEdition
+    }
+    foreach obj [$compObj getProcsGroupsObjects] {
+          $obj versionEdition
+    }
+    $compObj versionEdition
+}
+IDE::TPersistence instproc testGBquestVersion {} {
+    my instvar compObj methodArr
+    $compObj setObjectsArray objArr
+    foreach obj [array names objArr] {
+        my assert {[[$compObj getObject $obj] isclosed]}
+    }
+    my assert {[$compObj isclosed]}
+}
+IDE::TPersistence instproc testGCNewComponentEdition {} {
+    my instvar compObj
+    set oldid [$compObj set componentid]
+    $compObj createNewEdition
+    my assert {$oldid!=[$compObj set componentid]}
+    my assert {$oldid==[$compObj set basedon]}
+    # adding new class
+    namespace eval :: {
+         Class TestE
+         TestE instproc m1 {} { puts test }
+         TestE instproc m2 {} { puts test }
+    }
+    TestE moveToComponent TestCase
+    my assert {[ide::lcontain [$compObj getClasses] TestE]}
+
+    # removing class
+    $compObj removeClass TestB
+    TestB destroy
+    my assert {![ide::lcontain [$compObj getClasses] TestB]}
+
+    # modifing class
+    namespace eval :: {
+         TestA instproc s1 {} { puts test }
+         TestA instproc m2 {} {}
+    }
+}
+IDE::TPersistence instproc testGDReloadComponentEdition {} {
+    my instvar compObj compId
+    IDE::ComponentPersistence loadNameVersionId TestCase $compId {}
+    my assert {[$compObj set componentid]==$compId}
+    my testGBquestVersion
+    # test add
+    my assert {![ide::lcontain [$compObj getClasses] TestE]}
+    # test remove
+    my assert {[ide::lcontain [$compObj getClasses] TestB]}
+    # test modify class
+    # adding method
+    my assert {[TestA info instprocs s1] eq ""}
+    # deleting method
+    my assert {[TestA info instprocs m2] ne ""}
+}
+IDE::TPersistence instproc testHAunloadComponent {} {
+    my instvar compObj
+    $compObj unload
+    if {[Object isobject TestA]} error
+    if {[Object isobject TestB]} error
+    if {[Object isobject TestC]} error
+    if {[Object isobject TestD]} error
+    if {[Object isobject TestE]} error
+}
+IDE::TPersistence instproc testIAloadComponent {} {
+    my instvar compObj compId
+    IDE::ComponentPersistence loadVersionId $compId
+    my assert {[Object isobject TestA]} 
+    my assert {[Object isobject TestB]}
+    my assert {[Object isobject TestC]}
+    my assert {[Object isobject TestD]}
+    my assert {![Object isobject TestE]}
+    set compObj [IDE::Component getCompObjectForNameIfExist TestCase]
+    my assert {$compObj ne ""}
+    my assert {[$compObj set componentid]==$compId}
+    my testGBquestVersion
+    $compObj setObjectsArray objArr
+    my assert {[llength [array names objArr]]==6}
+}
+IDE::TPersistence instproc testWComponentRemove {} {
+    if {[[IDE::DBPersistence getConnection] istype XOMetakit]} {
+        return
+    }
+    IDE::ComponentPersistence removeForEver TestCase
+    IDE::ComponentPersistence removeForEver TestCase2
+
+    my assert {[IDE::ComponentPersistence getVersionsForName TestCase] eq ""}
+
+    [IDE::Component getCompObjectForName TestCase] unload
+    [IDE::Component getCompObjectForName TestCase2] unload
+}
+IDE::TPersistence instproc testZARowCountsCheck {} {
+    my instvar countComponent countComponentObject countObject countObjectMethod countMethod countInfo
+    if {[[IDE::DBPersistence getConnection] istype XOMetakit]} {
+        return
+    }
+    set query "SELECT count(*) from Component"
+    if {$countComponent!=[lindex [IDE::DBPersistence queryAsList $query] 0]} {
+         error {wrong Component count}
+    }
+
+    set query "SELECT count(*) from ComponentObject"
+    if {$countComponentObject!=[lindex [IDE::DBPersistence queryAsList $query] 0]} {
+         error {wrong ComponentObject count}
+    }
+
+    set query "SELECT count(*) from Object"
+    if {$countObject!=[lindex [IDE::DBPersistence queryAsList $query] 0]} {
+          error {wrong Object count}
+    }
+
+    set query "SELECT count(*) from ObjectMethod"
+    if {$countObjectMethod!=[lindex [IDE::DBPersistence queryAsList $query] 0]} {
+         error {wrong ObjectMethod count}
+    }
+
+    set query "SELECT count(*) from Method"
+    if {$countMethod!=[lindex [IDE::DBPersistence queryAsList $query] 0]} {
+         error "wrong Method count old=$countMethod"
+    }
+
+    set query "SELECT count(*) from Info"
+    if {$countInfo!=[lindex [IDE::DBPersistence queryAsList $query] 0]} {
+         error {wrong Info count}
+    }
+
+}
+Class IDE::TSourceManaging -superclass {::IDE::TestCase ::IDE::SampleElements}
+@ ::IDE::TSourceManaging idemeta component IDETests
+IDE::TSourceManaging instproc endTest {} {
+   #file delete [my getFileName]
+   set cobj [IDE::Component getCompObjectForNameIfExist TestCase]
+   if {$cobj ne ""} {$cobj unload}
+}
+IDE::TSourceManaging instproc getFileName {} {
+    return TestCase.xotcl
+}
+IDE::TSourceManaging instproc testACreateComp {} {
+    my instvar cobj
+    set cobj [IDE::Component getCompObjectForName TestCase]
+    $cobj setVersionNumber 2.0
+}
+IDE::TSourceManaging instproc testBCreateObjects {} {
+    my instvar cobj
+    my addSampleObjects $cobj
+    my addSampleObjectsComments $cobj
+    my addSampleTclProcsGroup $cobj
+    my addSampleTclProcsGroupComments $cobj
+}
+IDE::TSourceManaging instproc testCSaveInFile {} {
+    my instvar cobj
+    $cobj saveAsScript [my getFileName]
+    my hardAssert {[file exists [my getFileName]]}
+    #[self] halt
+}
+IDE::TSourceManaging instproc testEUnload {} {
+    my instvar cobj
+    $cobj unload
+    my hardAssert {![Object isobject TestA]}
+    my hardAssert {![Object isobject TestB]}
+    my hardAssert {![Object isobject TestC]}
+}
+IDE::TSourceManaging instproc testFImportSource {} {
+    my instvar cobj
+    IDE::Component importCompsFromFile [my getFileName]
+    set cobj [IDE::Component getCompObjectForNameIfExist TestCase]
+    #[self] halt
+    my assert {$cobj ne ""}
+    my checkSampleObjects $cobj
+    my checkSampleObjectsComments $cobj
+    my checkSampleTclProcsGroup $cobj
+    my checkSampleTclProcsGroupComments $cobj
+
+}
+IDE::TSourceManaging instproc testGSaveComplex {} {
+    my instvar cobj
+    set target [file join [my getTestDir] xotcl_tests]
+    file mkdir $target
+    set tComps [list IDECore IDEView IDEBaseGUI]
+    IDE::Component saveComplex $tComps 0 0 $target
+    IDE::Component saveComplex $tComps 1 0 $target
+    IDE::Component saveComplex $tComps 0 1 $target
+    IDE::Component saveComplex $tComps 1 1 $target
+    file delete -force $target    
+}
+

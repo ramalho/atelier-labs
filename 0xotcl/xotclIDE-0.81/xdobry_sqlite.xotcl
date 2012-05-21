@@ -1,0 +1,322 @@
+# automatically generated from XOTclIDE
+# script require component xdobry::sql
+@ Component xdobry::sqlite {
+description {Sqlite - Adapter see http://www.sqlite.org
+
+Primary Author : Oleg Oleinick
+}
+}
+package provide xdobry::sqlite 0.76
+package require xdobry::sql
+namespace eval Sqlite {}
+@ tclproc Sqlite::date_format idemeta struct xdobry::sqlite Sqlite
+proc Sqlite::date_format {date format} {
+   if {$date == ""} {
+        return "" 
+    } elseif {[string length $date] == 14} {
+        set date "[string range $date 0 7] [string range $date 8 13]"
+    }
+    clock format [clock scan $date] -format $format
+}
+Class Sqlite -superclass ::Sqlinterface -parameter {
+    sqlfile
+    {interface sqlite}
+}
+@ ::Sqlite idemeta categories {api schema-api}
+@ ::Sqlite idemeta categoriesMethods {{insertRowAutoId returnAffectedRows isConnected disconnect getconnectargs query queryList connect escape execute} {getTables extract_table getColumns}}
+@ ::Sqlite idemeta component xdobry::sqlite
+Sqlite instproc buildTokenList sql {
+    # build list of list of tokens first list is a columns list
+    # "" token
+    set tokens [list]
+    # match ".+" expresions for DEFAULT
+    foreach t [regexp -inline -all -- {[^"]+|"[^"]+?"} $sql] {
+        if {[string index $t 0] ne "\""} {
+            # match (.+) expresions
+            foreach t2 [regexp -inline -all -- {[^(]+|\([^)]+?\)} $t] {
+                if {[string index $t2 0] ne "("} {
+                    # match words and delemiter ,
+                    foreach t3 [regexp -inline -all -- {[^,]+|,} $t2] {
+                        if {$t3 ne ","} {
+                            # match [] masking
+                            foreach t4 [regexp -inline -all -- {[^\[]+|\[[^\]]+?\]} $t3] {
+                                if {[string index $t4 0] ne "\["} {
+                                    foreach t5 [regexp -inline -all -- {\w+} $t4] {
+                                        lappend tokens $t5
+                                    }
+                                } else {
+                                    regexp {\[(.+)\]} $t4 _ inner
+                                    lappend tokens $inner
+                                }
+                            }
+                        } else {
+                            lappend tokens $t3
+                        }
+                    }
+                } else {
+                    lappend tokens $t2
+                }
+            }
+        } else {
+            lappend tokens $t
+        }
+    }
+    set columns [list]
+    set column [list]
+    foreach t $tokens {
+        if {$t eq ","} {
+            lappend columns $column
+            set column [list]
+        } else {
+            lappend column $t
+        }
+    }
+    lappend columns $column
+    return $columns
+}
+Sqlite instproc connect par_list {
+    array set par_array $par_list
+    set sqlhandle [Object autoname sqlite]
+    if {[catch {sqlite $sqlhandle $par_array(sqlfile)} err]} {
+        return 1
+    }
+    my set dbank $par_array(sqlfile)
+    $sqlhandle function date_format Sqlite::date_format
+    $sqlhandle function NOW {
+        clock format [clock seconds] -format "%Y%m%d%H%M%S"
+    }
+    my set sqlfile $par_array(sqlfile)
+    my set sqlhandle $sqlhandle
+    my set connected 1
+    return 0
+}
+Sqlite instproc dateFormat date {
+    return "date_format($date,'%d.%m.%Y %H:%M:%S')"
+}
+Sqlite instproc disconnect {} {
+    if {[my exists connected] && [my set connected]} {
+        [my set sqlhandle] close
+        my unset sqlhandle
+        my set connected 0
+    }
+}
+Sqlite instproc escape string {
+    string map [list \0 \\0 ' '' ] $string
+}
+Sqlite instproc execute sqlstatement {
+    if {[catch  {[my set sqlhandle] eval $sqlstatement} err]} {
+        my errorMessage $err
+        return
+    }
+    my returnAffectedRows
+}
+Sqlite instproc extract_table {visitor table} {
+    set sql [lindex [lindex [my queryList "select sql from sqlite_master where name='$table'"] 0] 0]
+    regexp {\((.+)\)} $sql _ isql
+    foreach column [my scanCreate $isql] {
+      	$visitor newattribute $column
+    }
+}
+Sqlite instproc getColumns table {
+    set sql [lindex [lindex [my queryList "select sql from sqlite_master where name='$table'"] 0] 0]
+    regexp {\((.+)\)} $sql _ isql
+    set columns [list]
+    foreach column [my scanCreate $isql] {
+        foreach keyvalue $column {
+            if {[lindex $keyvalue 0] eq "name"} {
+                lappend columns [lindex $keyvalue 1]
+                break
+            }
+        }
+    }
+    return $columns
+}
+Sqlite instproc getTables {} {
+    my queryList "select name from sqlite_master where type = 'table'"
+}
+Sqlite instproc getTypeConvert {} {
+    list numeric decimal image longblob nvarchar varchar real float currency money longtext text longchar text memo text note text ntext text string varchar character varchar alphanumeric varchar integer int longbinary longblob general longblob binary longblob varbinary longblob logical boolean logical1 boolean yesno boolean bit boolean tinyint smallint interger1 smallint guid char
+}
+Sqlite instproc getconnectargs {} {
+    return {{sqlfile file {}}}
+}
+Sqlite instproc getdblist {} {
+  return dblist_not_supported
+}
+Sqlite instproc getinsertid {} {
+    return [[my set sqlhandle] last_insert_rowid]
+}
+Sqlite instproc insertRowAutoId {table columns values {primarykey {}} {sequenzer {}}} {
+    my insertRow $table $columns $values
+    my getinsertid
+}
+Sqlite instproc isConnected {} {
+    expr { [my exists connected] && [my set connected]}
+}
+Sqlite instproc query sqlstatement {
+    set statement [Sqlite::SqlQuery new -sqlhandle [my set sqlhandle]]
+    if { [catch {$statement open $sqlstatement} err] } {
+        my errorMessage $err
+        return
+    } else {
+        return $statement
+    }
+}
+Sqlite instproc queryList sqlstatement {
+    set result [list]
+    if {[catch {
+        [my set sqlhandle] eval $sqlstatement data {
+            set row {}
+            foreach column $data(*) {
+                lappend row $data($column)
+            }
+            lappend result $row
+        }
+    } err]} {
+        my errorMessage $err
+        return
+    }
+    return $result
+}
+Sqlite instproc returnAffectedRows {} {
+    [my set sqlhandle] changes
+}
+Sqlite instproc scanCreate isql {
+    # return named list in keyedlist syntax für jede spalte
+    set index 0
+    set count 0
+    set columns [list]
+    set reswords [list CONSTRAINT PRIMARY UNIQUE ON NOT INDEX]
+    set names [list]
+    array set typeconv [my getTypeConvert]
+
+    foreach column [my buildTokenList $isql] {
+        set columnDef [list]
+        set name [lindex $column 0]
+        # skip constrains definitions
+        if {[lsearch -exact $reswords [string toupper $name]]>=0} {
+            if {[lindex $column 0] eq "PRIMARY" && [lindex $column 1] eq "KEY"} {
+                regexp -- {\((.+)\)} [lindex $column 2] _ ldef
+                set ldef [split $ldef ,]
+                foreach pk $ldef {
+                    if {[info exists columnsArr($pk)]} {
+                        lappend columnsArr($pk) [list primary_key 1]
+                    }
+                }
+            }
+            continue
+        }
+        set type [string tolower [lindex $column 1]]
+        if {[info exists typeconv($type)]} {
+             set type $typeconv($type)
+        }
+        lappend columnDef [list name $name]
+        lappend columnDef [list type $type]
+        if {[string index [lindex $column 2] 0] eq "("} {
+            regexp -- {\((.+)\)} [lindex $column 2] _ ldef
+            set ldef [split $ldef ,]
+            lappend columnDef [list length [lindex $ldef 0]]
+            if {[llength $ldef]>1} {
+                lappend columnDef [list precision [lindex $ldef 1]]
+            }
+        }
+        if {[set defIndex [lsearch -regexp $column (?i)DEFAULT]]>1} {
+            set default [lindex $column [expr {$defIndex+1}]]
+            regexp -- {"(.+)"} $default _ default
+            lappend columnDef [list default $default]
+        }
+        set notnull 0
+        if {[set pIndex [lsearch -regexp $column (?i)PRIMARY]]>1} {
+            if {[string equal -nocase [lindex $column [expr {$pIndex+1}]] KEY]} {
+                lappend columnDef [list primary_key 1]
+                set notnull 1
+                if {[string equal -nocase $type integer]} {
+                     lappend columnDef [list auto_increment 1]
+                }
+            }
+        }
+        if {[set pIndex [lsearch -regexp $column (?i)NOT]]>1} {
+            if {[string equal -nocase [lindex $column [expr {$pIndex+1}]] NULL]} {
+                set notnull 1
+            }
+        }
+        if {!$notnull} {
+            lappend columnDef [list null 1]
+        }
+        set columnsArr($name) $columnDef
+        lappend names $name
+    }
+    foreach n $names {
+        lappend columns $columnsArr($n)
+    }
+    return $columns
+}
+Sqlite instproc setdb dbname {
+   my set dbank $dbname
+}
+Sqlite proc date_format {date format} {
+   if {$date == ""} {
+        return "" 
+    } elseif {[string length $date] == 14} {
+        set date "[string range $date 0 7] [string range $date 8 13]"
+    }
+    clock format [clock scan $date] -format $format
+}
+@ Sqlite proc initializeInterface {} {
+description {
+}
+}
+Sqlite proc initializeInterface {{prefs package}} {
+   if { $prefs == "package" } {
+       if {![catch {package require sqlite}]} return
+       if {![catch {package require tclsqlite}]} return
+       set prefs tclsqlite[info sharedlibextension]
+   }
+   if {[catch {load $prefs} err]} {
+       puts stderr "can not load library $prefs: $err"
+   }
+}
+Class Sqlite::SqlQuery -parameter {
+    {sqlhandle}
+}
+@ ::Sqlite::SqlQuery idemeta component xdobry::sqlite
+Sqlite::SqlQuery instproc close {} {
+    my unset result
+    my unset columns
+    my unset position
+}
+Sqlite::SqlQuery instproc columnNames {} {
+    my set columns
+}
+Sqlite::SqlQuery instproc fetch {} {
+    set position [my set position]
+    if { $position < [my rows] } {
+        my incr position
+        return [lindex [my set result] $position]
+    } else {
+        return
+    }
+}
+Sqlite::SqlQuery instproc open sqlstatement {
+    my instvar result columns position
+    set columns {}
+    set result {}
+    set position 0
+    [my set sqlhandle] eval $sqlstatement data {
+        set row {}
+        foreach column $data(*) {
+            lappend row $data($column)
+        }
+        lappend result $row
+    }
+    if { [info exists data(*)] } {
+        set columns $data(*)
+    }
+}
+Sqlite::SqlQuery instproc rows {} {
+    llength [my set result]
+}
+Sqlite::SqlQuery instproc seek point {
+    my set position $point
+}
+

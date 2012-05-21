@@ -1,0 +1,17 @@
+<html>
+<!--teste0.html-->
+<body id="fundo" bgcolor="#777777">
+<script>
+var slider=document.getElementById('fundo')
+for(var i=0; i<256; i+=16){
+    var faixa=document.createElement('div')
+    faixa.style.height="32px"
+    faixa.style.backgroundColor="rgb("+i+",0,0)"
+    faixa.innerHTML=i
+    faixa.style.color="rgb(255,255,0)"
+    slider.appendChild(faixa)
+     
+}   
+</script>
+</body>
+</html>

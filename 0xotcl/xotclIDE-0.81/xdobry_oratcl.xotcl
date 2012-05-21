@@ -1,0 +1,200 @@
+# automatically generated from XOTclIDE
+# script require component xdobry::sql
+package provide xdobry::oratcl 0.74
+package require xdobry::sql
+Class ORATcl -superclass ::Sqlinterface  -parameter {{interface Oracle}}
+@ ::ORATcl idemeta component xdobry::oratcl
+ORATcl instproc connect par_list {
+    [self] instvar handle connected datasource password user
+    array set par_array $par_list
+    foreach k {datasource user password} {
+         my set $k $par_array($k)
+    }
+    if {[catch {set handle [oralogon $user/$password@$datasource]} err]!=0} {
+        my errorMessage $err
+        return 0
+    }
+    # set autocommit on true
+    oraautocom $handle 1
+    my set dbank $datasource
+    set connected 1
+    return 1
+}
+ORATcl instproc disconnect {} {
+   if {[my exists connected] && [my set connected]} {
+        oralogoff [my set handle]
+        my set connected 0
+   }
+}
+ORATcl instproc execute statement {
+    my instvar handle
+    set qhandle [oraopen $handle]
+    if {[oraparse $qhandle $statement]!=0} {
+        oraclose $qhandle
+        return
+    }
+    if {[catch {oraexec $qhandle} err]} {
+        my errorMessage $err
+        oraclose $qhandle
+        return
+    }
+    set ret [oramsg $qhandle rows]
+    oraclose $qhandle
+    return $ret
+}
+ORATcl instproc extract_table {visitor table} {
+    my instvar handle
+    # {name size type precision scale nullok}
+    #  0    1    2    3         4     5
+    
+    # this array specify the conversion of types
+    array set typeconv [my getTypeConvert]
+    
+    # Unbekannt bleiben default value und primary key
+    foreach attr [oradesc $handle $table] {
+        set alist {}
+        keylset alist name [lindex $attr 0]
+        set type [string tolower [lindex $attr 2]]
+	if {[info exists typeconv($type)]} {
+             set type $typeconv($type)
+        }
+        keylset alist type $type
+        keylset alist null [lindex $attr 5]
+        if {$type eq "decimal"} {
+            # PRECISION
+            keylset alist length [lindex $attr 1]
+            # SCALE
+            keylset alist precision [lindex $attr 3]
+        } else {
+            keylset alist precision [lindex $attr 3]
+            if {$type eq "varchar"} {
+                keylset alist length [lindex $attr 1]
+            } else {
+                keylset alist length [lindex $attr 1]
+            }
+        }
+        $visitor newattribute $alist
+    }
+}
+ORATcl instproc getColumns table {
+    my instvar handle
+    set ret [list]
+    foreach c [oradesc $handle $table] {
+        lappend ret [lindex $c 0]
+    }
+    return $ret
+}
+ORATcl instproc getSequence sequenzer {
+    lindex [lindex [my queryList "select $sequenzer.nextval from dual"] 0] 0
+}
+ORATcl instproc getTables {} {
+    my queryList {select TABLE_NAME from USER_TABLES}
+}
+ORATcl instproc getTimeStampFunction {} {
+    return CURRENT_TIMESTAMP
+}
+ORATcl instproc getTimeValue time {
+    if {[string first 0000-00-00 $time]} {
+        return NULL
+    }
+    # Oracle accept only platfomr format
+    # we suppose that we have us format 
+    # also cut last digits
+    regexp {.*\d\d:\d\d:\d\d} $time time
+    return "to_timestamp('$time','YYYY-MON-DD HH:MI:SS')"
+}
+ORATcl instproc getTypeConvert {} {
+    list number decimal varchar2 varchar nvarchar2 varchar nchar char date datetime blob longblob clob text long longblob raw longblob {long raw} longblob nclob text
+}
+ORATcl instproc getconnectargs {} {
+    list {datasource text{}} {user text {}} {password password {}}
+}
+ORATcl instproc getdblist {} {
+}
+ORATcl instproc hasfunction func {
+    set iclass ORATcl::SqlQuery
+    if {[[my info class] info instprocs $func] ne ""} {
+        return 1
+    } 
+    
+    if {[$iclass info instprocs $func] ne ""} {
+        return 1
+    } else {
+        return 0
+    }
+}
+ORATcl instproc insertRowAutoId {table columns values {primarykey {}} {sequenzer {}}} {
+    if {$sequenzer eq ""} {
+        set sequenzer ${table}_seq
+    }
+    if {$primarykey eq ""} {
+        set primarykey id
+    }
+    set idvalue [my getSequence $sequenzer]
+    lappend columns $primarykey
+    lappend values $idvalue
+    my insertRow $table $columns $values
+    return $idvalue
+}
+ORATcl instproc maskTableName tableName {
+    string map {" " _} $tableName
+}
+ORATcl instproc query statement {
+    my instvar handle
+    set qhandle [oraopen $handle]
+    oraconfig $qhandle nullvalue {}
+    if {[catch {set ret [orasql $qhandle $statement]} err]} {
+        my errorMessage $err
+        oraclose $qhandle
+        return    
+    }
+    if {$ret==0} {
+        return [ORATcl::SqlQuery new -childof [self] -qhandle $qhandle]
+    } else {
+        my errorMessage $ret
+    }
+    oraclose $qhandle
+    return
+}
+ORATcl instproc queryList statement {
+    my instvar handle
+    set qhandle [oraopen $handle]
+    oraconfig $qhandle nullvalue {}
+    # there are two error handling possible
+    if {[catch {set ret [orasql $qhandle $statement]} err]} {
+        my errorMessage $err
+        oraclose $qhandle
+        return    
+    }
+    if {$ret==0} {
+        set ret [list]
+        while {[orafetch $qhandle -datavariable row]==0} {
+            lappend ret $row
+        }
+        oraclose $qhandle
+        return $ret    
+    } else {
+        my errorMessage $ret
+    }
+    oraclose $qhandle
+    return
+}
+ORATcl proc initializeInterface {{prefs package}} {
+    package require Oratcl
+}
+Class ORATcl::SqlQuery -parameter qhandle
+@ ::ORATcl::SqlQuery idemeta component xdobry::oratcl
+ORATcl::SqlQuery instproc columnNames {} {
+    oracols [my qhandle] name
+}
+ORATcl::SqlQuery instproc destroy {} {
+   oraclose [my qhandle]
+   next
+}
+ORATcl::SqlQuery instproc fetch {} {
+   if {[orafetch [my qhandle] -datavariable row]==0} {
+       return $row
+   }
+   return
+}
+

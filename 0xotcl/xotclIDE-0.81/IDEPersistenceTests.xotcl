@@ -1,0 +1,249 @@
+# automatically generated from XOTclIDE
+# script require component {IDECore IDETestFramework IDETests IDEPersistence}
+@ Component IDEPersistenceTests {
+description {Test for IDEPersistence Component
+You need version-system, connected database
+
+- the database user need create privileges
+
+The main target are tests of m:n mapping using
+in IDEConfiguration}
+}
+package provide IDEPersistenceTests 0.74
+package require IDECore
+package require IDEPersistence
+package require IDETestFramework
+package require IDETests
+Class IDE::BasePersistenceTest -superclass ::IDE::TestCase
+@ ::IDE::BasePersistenceTest idemeta component IDEPersistenceTests
+IDE::BasePersistenceTest instproc endTest {} {
+    my instvar s1 s2
+    IDE::SimplePersistenceClass::descriptor removeSchema
+    if {[Object isobject s1]} {$s1 destroy}
+    if {[Object isobject s2]} {$s2 destroy}
+}
+IDE::BasePersistenceTest instproc startTest {} {
+    if {![Object isobject IDE::SimplePersistenceClass::descriptor]} {
+        IDE::SimplePersistenceClass initDescriptor
+    }
+    IDE::SimplePersistenceClass::descriptor checkSchema
+    return 1
+}
+IDE::BasePersistenceTest instproc testAHCreation {} {
+    my instvar s1 s2
+    set s1 [IDE::SimplePersistenceClass new -name sample1]
+    set s2 [IDE::SimplePersistenceClass new -name sample2]
+    $s1 makePersistent
+    $s2 makePersistent
+    my assert {[$s1 exists sampleid]}
+}
+IDE::BasePersistenceTest instproc testBHCacheTest {} {
+    my instvar s1 s2
+    set s1p [IDE::SimplePersistenceClass::descriptor createInstanceFromDB IDE::SimplePersistenceClass [$s1 set sampleid]]
+    my assert {$s1p==$s1}
+}
+IDE::BasePersistenceTest instproc testCHReread {} {
+    my instvar s1
+    set olds1 $s1
+    set id [$s1 set sampleid]
+    $s1 destroy
+    set s1 [IDE::SimplePersistenceClass::descriptor createInstanceFromDB IDE::SimplePersistenceClass $id]
+    my assert {[$s1 set name] eq "sample1"}
+    my assert {$s1!=$olds1}
+}
+IDE::BasePersistenceTest instproc testDHSetRelationship {} {
+    my instvar s1 s2
+    IDE::SimplePersistenceClass::descriptor createRelationshipProxies $s2
+    ${s2}::childsamples setList $s1
+    ${s2}::childsamples updateList
+    my assert {[${s2}::childsamples getList]==$s1}
+}
+IDE::BasePersistenceTest instproc testEHRereadRelationship {} {
+    my instvar s1 s2
+    set id [$s2 set sampleid]
+    $s2 destroy
+    set s2 [IDE::SimplePersistenceClass::descriptor createInstanceFromDB IDE::SimplePersistenceClass $id]
+    my assert {[$s2 set name] eq "sample2"}
+    my assert {[${s2}::childsamples getList]==$s1}
+}
+IDE::BasePersistenceTest instproc testFHRereadRelationshipAll {} {
+    my instvar s1 s2
+    set id [$s2 set sampleid]
+    $s2 destroy
+    $s1 destroy 
+    set s2 [IDE::SimplePersistenceClass::descriptor createInstanceFromDB IDE::SimplePersistenceClass $id]
+    my assert {[$s2 set name] eq "sample2"}
+    set s1 [${s2}::childsamples getList]
+    my assert {[$s1 set name] eq "sample1"}
+}
+IDE::BasePersistenceTest instproc testIHRelationshipManipulation {} {
+    my instvar s1 s2 s3
+    set s3 [IDE::SimplePersistenceClass new -name sample3]
+    $s3 makePersistent
+    ${s2}::childsamples setList [list $s1 $s3]
+    ${s2}::childsamples updateList
+    ${s2}::childsamples unset indexList
+    my assert {[${s2}::childsamples getList]==[list $s1 $s3]}
+    
+    ${s2}::childsamples setList [list $s3]
+    ${s2}::childsamples updateList
+    ${s2}::childsamples unset indexList
+    my assert {[${s2}::childsamples getList]==[list $s3]}
+
+    ${s2}::childsamples setList [list $s3 $s1]
+    ${s2}::childsamples updateList
+    ${s2}::childsamples unset indexList
+    my assert {[${s2}::childsamples getList]==[list $s3 $s1]}
+
+    ${s2}::childsamples setList [list $s1 $s3]
+    ${s2}::childsamples updateList
+    ${s2}::childsamples unset indexList
+    my assert {[${s2}::childsamples getList]==[list $s1 $s3]}
+
+    ${s2}::childsamples setList [list $s3 $s1]
+    ${s2}::childsamples updateList
+    ${s2}::childsamples unset indexList
+    my assert {[${s2}::childsamples getList]==[list $s3 $s1]}
+
+    ${s2}::childsamples setList [list $s1]
+    ${s2}::childsamples updateList
+    ${s2}::childsamples unset indexList
+    my assert {[${s2}::childsamples getList]==[list $s1]}
+
+    ${s2}::childsamples setList [list $s3 $s1]
+    ${s2}::childsamples updateList
+    ${s2}::childsamples unset indexList
+    my assert {[${s2}::childsamples getList]==[list $s3 $s1]}
+}
+Class IDE::ConfigMapTestNoGUI -superclass {::IDE::TestCase ::IDE::SampleElements}
+@ ::IDE::ConfigMapTestNoGUI idemeta component IDEPersistenceTests
+IDE::ConfigMapTestNoGUI instproc startTest {} {
+     Object isobject IDE::ConfigurationMap
+}
+IDE::ConfigMapTestNoGUI instproc testAGMakeSampleComponent {} {
+    my instvar cobj
+    set cobj [IDE::Component getCompObjectForName TestCase]
+    my addSampleObjects $cobj
+    
+    IDE::ComponentPersistence importComponent [$cobj getName]
+    my assert {[$cobj isPersistent]}
+}
+IDE::ConfigMapTestNoGUI instproc testBGComponentWrapper {} {
+    my instvar cwrap cobj
+    set cwrap [IDE::ComponentConfWrapper::descriptor createInstanceFromDB IDE::ComponentConfWrapper [$cobj set componentid]]
+    my assert {[$cobj getName]==[$cwrap name]}
+    my assert {[$cobj set componentid]==[$cwrap set componentid]}
+    my assert {[$cobj set defcounter]==[$cwrap set defcounter]}
+    #my assert {[$cobj set basedon]==[$cwrap set basedon]}
+    #my assert {[$cobj set timestamp]==[$cwrap set timestamp]}
+    my assert {[$cobj set versioninfo]==[$cwrap set versioninfo]}
+    my assert {[$cobj set userid]==[$cwrap set userid]}
+    #my assert {[$cobj set isclosed]==[$cwrap set isclosed]}
+    
+}
+IDE::ConfigMapTestNoGUI instproc testBHComponentWrapperTest {} {
+   my instvar cwrap
+   $cwrap getRequirements 
+   $cwrap versionDisplay 
+   #$cwrap load 
+   my assert {[$cwrap isActualLoaded]}
+   #$cwrap viewEdition 
+   #$cwrap viewInfo 
+   $cwrap nameVersion
+    
+}
+IDE::ConfigMapTestNoGUI instproc testCGNewCreateConfmap {} {
+    my instvar confmap
+    set confmap [IDE::ConfigurationMap new -name TestConfMap]
+    $confmap makePersistent
+}
+IDE::ConfigMapTestNoGUI instproc testCHTestConfmap {} {
+   my instvar confmap
+   #$confmap setCMaps cmaps
+   #$confmap updateVersion 
+   $confmap versionDisplay 
+   my assert {[$confmap getCMaps] eq ""}
+   #$confmap viewInfo
+   $confmap getCMapString 
+   #$confmap copyAndCreateNewEdition 
+   #$confmap load 
+   $confmap reorderComponents 
+   #$confmap setComponents comps
+   $confmap setComponetsArray testArr
+   #$confmap exportToMap file
+   #$confmap importFromMap 
+   #$confmap makeTransient 
+   $confmap getCMapsNamesDeep 
+   $confmap getComponents 
+   $confmap nameVersion
+}
+IDE::ConfigMapTestNoGUI instproc testDGAddComponents {} {
+    my instvar confmap cwrap 
+    $confmap setComponents $cwrap
+    ${confmap}::components updateList
+    my assert {![$confmap canVersion]}
+}
+IDE::ConfigMapTestNoGUI instproc testEGUnloadComponents {} {
+    my instvar confmap cwrap cobj
+    foreach obj [$cobj getClasses] {
+          [$cobj getObject $obj] versionEdition
+    }
+    foreach obj [$cobj getObjects] {
+          [$cobj getObject $obj] versionEdition
+    }
+    foreach obj [$cobj getProcsGroupsObjects] {
+          $obj versionEdition
+    }
+    $cobj versionEdition
+    $cobj unload
+    my assert {[IDE::Component getCompObjectForNameIfExist TestCase] eq ""}
+    my assert {![$cwrap isActualLoaded]}
+    $cwrap refreshData
+    my assert {[$cwrap isclosed]}
+    my assert {[$confmap canVersion]}
+}
+IDE::ConfigMapTestNoGUI instproc testEILoadComponents {} {
+    my instvar confmap cwrap cobj
+    $cwrap load
+    set ncobj [IDE::Component getCompObjectForNameIfExist TestCase]
+    my assert {$ncobj ne ""}
+    my assert {$cobj ne $ncobj}
+    set cobj $ncobj
+    my assert  {[$cwrap isActualLoaded]}
+    
+}
+IDE::ConfigMapTestNoGUI instproc testFGUnloadCMap {} {
+    my instvar confmap cwrap configmapid
+    set configmapid [$confmap set configmapid]
+    $confmap destroy
+    $cwrap destroy
+    
+}
+IDE::ConfigMapTestNoGUI instproc testFILoadCMap {} {
+    my instvar confmap cwrap configmapid
+    set confmap [IDE::ConfigurationMap::descriptor createInstanceFromDB IDE::ConfigurationMap $configmapid]
+    set cwrap [$confmap getComponents]
+    my assert {[llength $cwrap]==1}
+    my assert {[$cwrap name] eq "TestCase"}
+    my assert {[$cwrap isActualLoaded]}
+}
+IDE::ConfigMapTestNoGUI instproc testKGDeleteConfmap {} {
+    [my set confmap] makeTransient
+}
+IDE::ConfigMapTestNoGUI instproc testVGDeleteConfmap {} {
+   my instvar cobj
+   $cobj unload
+   IDE::ComponentPersistence removeForEver TestCase
+}
+Class IDE::SimplePersistenceClass -superclass {::IDE::DBPersistence ::IDE::CachedObject} -parameter name
+@ ::IDE::SimplePersistenceClass idemeta component IDEPersistenceTests
+IDE::SimplePersistenceClass proc initDescriptor {} {
+    set des [IDE::DBMapping [self]::descriptor -table Sample -idColumn sampleid -cached 1]
+    $des addColumn {name varchar(50) name name}
+    
+    $des addRelationship [IDE::DBRelMappingNM new -childof $des -name childsamples -targetClass IDE::SimplePersistenceClass -relationTable SampleRel -sourceName sampleid -targetName samplechildid -orderIndexName loadorder]
+}
+IDE::SimplePersistenceClass proc initFromDB {columns values componentid} {
+    my new
+}
+

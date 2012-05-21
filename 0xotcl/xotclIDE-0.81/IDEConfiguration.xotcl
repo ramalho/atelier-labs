@@ -1,0 +1,1079 @@
+# automatically generated from XOTclIDE
+# script require component {IDECore IDEView IDEBaseGUI IDEPersistence IDEPersistenceAdd}
+@ Component IDEConfiguration {
+description {This component is designed as XOTclIDE Plugin.
+It can be used only with DB Version System.
+
+You can load it per menu
+System->Version Control->Configuration Browser
+
+It provides versioned configuration maps.
+A configuration map is a ordered collection of componets and
+another configurations maps.
+
+A configuration map have edtions and can be compared in changes
+browser. The versioning of configuration map work equal to versioning
+of components or classes.
+
+You can import/export the version system configuration maps to
+file based configurations maps.
+
+Configuration Browser was programmed by using
+some extended techniques
+1. modell view controler gui pattern
+2. events messaging.
+3. controler is object IDE::ConfigmapControler (singleton) used.
+4. Also here was using new persistence interface with
+n:m mapping and object identity caching.
+
+
+}
+}
+package provide IDEConfiguration 0.80
+package require IDEBaseGUI
+package require IDECore
+package require IDEPersistence
+package require IDEPersistenceAdd
+package require IDEView
+Class IDE::CMapsChangesBrowser -superclass ::IDE::ChangesBrowser -parameter {{mode components}}
+@ ::IDE::CMapsChangesBrowser idemeta component IDEConfiguration
+IDE::CMapsChangesBrowser instproc compareCMaps {tcmap1 tcmap2} {
+    my instvar cmap1 cmap2 cmapArr1 cmapArr2
+    set cmap1 $tcmap1
+    set cmap2 $tcmap2
+    $cmap1 setComponetsArray cmapArr1
+    $cmap2 setComponetsArray cmapArr2
+    [self]::components setList [my getDiffFromArrays cmapArr1 cmapArr2]
+}
+IDE::CMapsChangesBrowser instproc getComponentWithId id {
+    my instvar compeditionArr
+    if {[info exists compeditionArr($id)]} {
+        set inst $compeditionArr($id)
+    } else {
+        set inst [IDE::ComponentEdition new -childof [self] $id]
+        set compeditionArr($id) $inst
+    }
+    return $inst
+}
+IDE::CMapsChangesBrowser instproc getSourcesWindows fwin {
+    IDE::NListView create [self]::components $fwin.components -notify [self] -notifyProc selectComponent
+    IDE::NListView create [self]::classes $fwin.classes -notify [self] -notifyProc selectClass
+    IDE::NListView create [self]::methods $fwin.methods -notify [self] -notifyProc selectMethod
+    return [list $fwin.components $fwin.classes $fwin.methods]
+}
+IDE::CMapsChangesBrowser instproc selectComponent cname {
+    my instvar cmap1 cmap2 cmapArr1 cmapArr2 comp1 comp2 compArr1 compArr2
+    catch {unset compArr1 compArr2}
+    if {[info exists cmapArr1($cname)]} {
+        set comp1 [my getComponentWithId $cmapArr1($cname)]
+        $comp1 setObjectsArray compArr1
+        set lab1 "[$comp1 getName] [$comp1 set componentid]"
+    } else {
+        set comp1 {}
+        set lab1 "not exists"
+    }
+    if {[info exists cmapArr2($cname)]} {
+        set comp2 [my getComponentWithId $cmapArr2($cname)]
+        $comp2 setObjectsArray compArr2
+        set lab2 "[$comp2 getName] [$comp2 set componentid]"
+    } else {
+        set lab2 "not exists"
+        set comp2 {}
+    }
+    [self]::classes setList [my getDiffFromArrays compArr1 compArr2]
+    my setCompareLabels $lab1 $lab2
+}
+IDE::CMapsChangesBrowser proc compareCMaps {cmap1 cmap2} {
+    set obj [my create [Object autoname browser] [Object autoname .browser] -mode components]
+    $obj compareCMaps $cmap1 $cmap2
+    return $obj
+}
+@ Class IDE::ComponentConfWrapper {
+description {Wrapper for Component
+It has small resource-arm interface and it will
+be cached
+}
+}
+Class IDE::ComponentConfWrapper -superclass {::IDE::DBPersistence ::IDE::CachedObject} -parameter name
+@ ::IDE::ComponentConfWrapper idemeta component IDEConfiguration
+IDE::ComponentConfWrapper instproc getRequirements {} {
+    if {![my exists reqComps]} {
+        my instvar reqComps
+        set reqComps [list]
+        foreach row [[my getPersistenceManager] selectAsList ComponentRequire name componentid [my set componentid]] {
+            lappend reqComps [lindex $row 0]
+        }
+    }
+    my set reqComps
+}
+IDE::ComponentConfWrapper instproc isActualLoaded {} {
+    set cobj [IDE::Component getCompObjectForNameIfExist [my name]]
+    expr {$cobj ne "" && [$cobj isPersistent] && [$cobj set componentid]==[my set componentid]}
+}
+IDE::ComponentConfWrapper instproc load {} {
+    set cobj [IDE::Component getCompObjectForNameIfExist [my name]]
+    IDE::ComponentPersistence loadNameVersionId [my name] [my set componentid] $cobj
+}
+IDE::ComponentConfWrapper instproc nameVersion {} {
+    return "[my name] - [my versionDisplay]"
+}
+IDE::ComponentConfWrapper instproc refreshData {} {
+    my rereadAttributes {name defcounter basedon timest versioninfo userid isclosed}
+}
+IDE::ComponentConfWrapper instproc versionDisplay {} {
+    if {[my set isclosed]} {
+        set v "V-"
+    } else {
+        set v {}
+    }
+    return "$v[my set versioninfo] [my set timestamp]"
+}
+IDE::ComponentConfWrapper instproc viewEdition {} {
+    IDE::EditionBrowser browseComponentId [my set componentid]
+}
+IDE::ComponentConfWrapper instproc viewInfo {} {
+    IDE::VersionInfoView showVersionInfo [self]
+}
+IDE::ComponentConfWrapper proc initDescriptor {} {
+    set des [IDE::DBMapping [self]::descriptor -table Component -idColumn componentid -cached 1]
+    $des addColumn {name varchar(50)}
+    $des addColumn {defcounter int}
+    $des addColumn {basedon int}
+    $des addColumn {timest timestamp(14) getTimeStamp setTimeStamp}
+    $des addColumn {versioninfo varchar(30)}
+    $des addColumn {userid int getUserId}
+    $des addColumn {isclosed bool}
+}
+IDE::ComponentConfWrapper proc initFromDB {columns values componentid} {
+    my new
+}
+@ Class IDE::ComponentGroup {
+description {Helper class to hold all version of one logic component name
+(with same name) as Instance.
+It is used only for display in list and has no additional
+functionality
+}
+}
+Class IDE::ComponentGroup -parameter name
+@ ::IDE::ComponentGroup idemeta component IDEConfiguration
+Class IDE::ConfigmapBrowser -superclass {::IDE::Browser ::IDE::GUICommands ::IDE::EventHandlerMix} -parameter {{atHead 1}}
+@ ::IDE::ConfigmapBrowser idemeta component IDEConfiguration
+IDE::ConfigmapBrowser instproc changeViewType type {
+    my signalEvent changeViewType $type
+}
+IDE::ConfigmapBrowser instproc fillMenuStruct aMenuStruct {
+    $aMenuStruct addCommand {Reload All} {IDE::ConfigmapControler reloadConfigmaps}
+    $aMenuStruct addCommand {Some Help} {IDE::Dialog message "Use pop-up menus to perform actions. Warning! This configuration tool is in alfa state"}
+}
+IDE::ConfigmapBrowser instproc getMenuStruct {} {
+    return [IDE::MenuStruct [self]::ms Configuration 0]
+}
+IDE::ConfigmapBrowser instproc getTitle {} {
+    return {Configuration Browser}
+}
+IDE::ConfigmapBrowser instproc specificInit {} {
+    my instvar win
+    IDE::ListViewEvent [self]::names $win.names -label Configuration
+    IDE::ListViewEvent [self]::versions $win.versions -label {Conf. Version}
+    IDE::ListViewEvent [self]::components $win.components -label Components
+    IDE::ListViewEvent [self]::cmaps $win.cmaps -label {Dependent Confs.}
+    IDE::MethodEdit [self]::text $win.text -height 14 -width 50
+    IDE::StateButton [self]::cbutton $win.cbutton  -states {Comment preStartScript startScript} -command [list [self] changeViewType]
+        
+    grid $win.names -row 0 -column 0 -rowspan 4 -sticky ns
+    grid $win.versions -row 0 -column 1 -sticky ew
+    grid $win.components -row 0 -column 2 -rowspan 2 -sticky news
+    grid $win.cmaps -row 1 -column 1 -sticky news
+    grid $win.text -row 2 -column 1 -columnspan 2 -sticky news
+    grid $win.cbutton -row 3 -column 1 -sticky w
+    grid columnconfigure $win 1 -weight 1
+    grid columnconfigure $win 2 -weight 2
+    grid rowconfigure $win 1 -weight 1
+    grid rowconfigure $win 2 -weight 1
+}
+IDE::ConfigmapBrowser proc newBrowser {} {
+    if {[Object isobject cmbrowser]} {return cmbrowser}
+    set inst [my create cmbrowser [Object autoname .browser]]
+    IDE::ConfigmapControler setView $inst
+    return $inst
+}
+@ Class IDE::ConfigurationMap {
+description {The base class symbolize the persistent configuration map
+
+Configmap ist a collection of
+persistence components and another configmaps
+
+With its help you can exactly specify (also hierarchaly) which componets and
+which version of them should be loaded.
+You can and shuld use configmap to specify the deploment packages of your
+software
+}
+}
+Class IDE::ConfigurationMap -superclass {::IDE::DBPersistence ::IDE::DBInfo ::IDE::CachedObject} -parameter {name {prescript {}} {postscript {}} {isclosed 0}}
+@ ::IDE::ConfigurationMap idemeta categories {persistence-handling accessing accessing-rel user-actions}
+@ ::IDE::ConfigurationMap idemeta categoriesMethods {{copyAndCreateNewEdition makeTransient updateVersion} {nameVersion getCMapString versionDisplay getCMapsNamesDeep setComponetsArray} {getComponents setComponents setCMaps getCMaps} {viewInfo load reorderComponents importFromMap exportToMap}}
+@ ::IDE::ConfigurationMap idemeta component IDEConfiguration
+IDE::ConfigurationMap instproc canVersion {} {
+    if {[my set isclosed]} {return 0}
+    foreach c [my getComponents] {
+        if {![$c isclosed]} {return 0}
+    }
+    return 1
+}
+IDE::ConfigurationMap instproc copyAndCreateNewEdition {} {
+    set inst [Object autoname confmap]
+    [self] copy $inst
+    $inst createNewEdition
+    return $inst
+}
+IDE::ConfigurationMap instproc exportToMap {{file {}}} {
+    my instvar fileName
+    if {![my exists fileName]} {
+        my set fileName newconfig.cfmap
+    }
+    if {$file eq ""} {
+        set file [IDE::Dialog getSaveFile $fileName]
+    }
+    if {$file eq ""} return
+    set of [open $file w]
+    puts $of [my getCMapString]
+    close $of
+}
+IDE::ConfigurationMap instproc getCMapString {} {
+    set script {}
+    append srcipt "# Genarated from Coniguration Browser\n"
+    append script "set preStartScript [list [my prescript]]\n"
+    append script "set componentsToLoad [list [ide::lcollect each [my getComponents] {list [$each name] [$each set componentid]}]]\n"
+    append script "set startScript [list [my prescript]]\n"
+    return $script   
+}
+IDE::ConfigurationMap instproc getCMaps {} {
+    [self]::childconigmaps getList
+}
+IDE::ConfigurationMap instproc getCMapsNamesDeep {} {
+    set names [ide::lcollect each [my getCMaps] {$each name}]]
+    foreach c [my getCMaps] {
+        set names [concat $names [$c getCMapsNamesDeep]]
+    }
+    return $names
+}
+IDE::ConfigurationMap instproc getComponents {} {
+    [self]::components getList
+}
+IDE::ConfigurationMap instproc importFromMap {} {
+    if {![IDE::SystemConfigMap loadFromFile]} {return 0}
+    set clist [IDE::SystemConfigMap getComponentsList 0]
+    if {$clist eq ""} {return 0}
+    set llist [ide::lcollect each [my getComponents] {$each getName}]
+    set imported {}
+    foreach celem $clist {
+        set name [lindex $celem 0]
+        set id [lindex $celem 1]
+        if {[ide::lcontain $llist $name]} continue
+        if {$id eq "package"} {
+            IDE::Transcript warning "can not import $name as package into configuration"
+            continue
+        }
+        set imp [IDE::ComponentConfWrapper::descriptor createInstanceFromDB IDE::ComponentConfWrapper $id]
+        if {$imp ne ""} {
+            lappend imported $imp
+        } else {
+            error "cound not import $name $id"
+        }
+    }
+    if {$imported eq ""} {return 0}
+    my setComponents [concat [my getComponents] $imported]
+    set ips [IDE::SystemConfigMap getValueForType preStartScript]
+    set ipos [IDE::SystemConfigMap getValueForType startScript]
+    if {$ips ne ""} {
+        my prescript $ips
+        my updateAttributes prescript
+    }
+    if {$ipos ne ""} {
+        my postscript $ipos
+        my updateAttributes postscript
+    }
+    
+    return 1
+}
+IDE::ConfigurationMap instproc init {} {
+    my set timestamp "fresh-inserted"
+    next
+}
+IDE::ConfigurationMap instproc load {} {
+    set llist [ide::lcollect each [my getComponents] {list [$each getName] [$each set componentid]}]
+    IDE::SystemConfigMap loadComponentsFromList $llist
+}
+IDE::ConfigurationMap instproc loadAndRun {} {
+    my instvar prescript postscript
+    if {[catch {namespace eval :: $prescript} ret]} {
+        IDE::Dialog message "prescript has failed with message $ret"
+    }
+    my load
+    if {[catch {namespace eval :: $postscript} ret]} {
+        IDE::Dialog message "prescript has failed with message $ret"
+    } else {
+        IDE::Transcript warning "configmap [my getName] was loaded and started"
+    }
+}
+IDE::ConfigurationMap instproc makeTransient {} {
+    my setCMaps {}
+    my setComponents {}
+    [self]::components updateList
+    [self]::childconigmaps updateList
+    next
+}
+IDE::ConfigurationMap instproc nameVersion {} {
+    return "[my name] - [my versionDisplay]"
+}
+IDE::ConfigurationMap instproc openInConfigurationsMapBrowser {} {
+    set llist [ide::lcollect each [my getComponents] {list [$each getName] [$each set componentid]}]
+    IDE::SystemConfigMap setValueForType preStartScript [my set prescript]
+    IDE::SystemConfigMap setValueForType startScript [my set postscript]
+    IDE::SystemConfigMap setValueForType componentsToLoad $llist
+    IDE::SystemConfigMap set configName [my set name]
+    IDE::ConfigurationBrowser showBrowser
+}
+IDE::ConfigurationMap instproc reorderComponents {} {
+    # !!! todo
+    set cobjs [my getComponents]
+    set comps {}
+    foreach c $cobjs {
+        lappend comps [$c name]
+        set compsArr([$c name]) $c
+    }
+    set outList {}
+    set outComps {}
+    foreach cobj $cobjs {
+        set name [$cobj getName]
+        if {[ide::lcontain $outList $name]} continue
+        foreach rcomp [$cobj getRequirements] {
+            if {[ide::lcontain $comps $rcomp]} {
+                ide::lappendIfNone outList $rcomp 
+                ide::lappendIfNone outComps $compsArr($rcomp)
+            }
+        }
+        lappend outList $name
+        lappend outComps $cobj
+    }
+    if {$cobjs!=$outComps} {
+        my setComponents $outComps
+        return 1 
+    }
+    return 0
+}
+IDE::ConfigurationMap instproc saveAsPackages {} {
+    set saveList {} 
+    foreach compWrap [my getComponents] {
+        if {![$compWrap isActualLoaded]} {
+            if {[IDE::Dialog yesNo "[$compWrap name] is not acutall loaded and can be not save as package. Shoul the saving be continued without this component"] ne "yes"} return
+        } else {
+            lappend saveList [$compWrap name]
+        }
+    }
+    if {$saveList ne ""} {
+        IDE::Component saveComplex $saveList 0 0 [pwd]
+        pkg_mkIndex -direct [pwd] *.xotcl
+        IDE::Dialog message "Components $saveList was saved in acuall dictionary [pwd]. pkgIndex.tcl was updated in this dictionary"
+    }
+}
+IDE::ConfigurationMap instproc setCMaps cmaps {
+    [self]::childconigmaps setList $cmaps
+}
+IDE::ConfigurationMap instproc setComponents comps {
+    [self]::components setList $comps
+}
+IDE::ConfigurationMap instproc setComponetsArray arr_ref {
+    upvar $arr_ref arr
+    foreach obj [my getComponents] {
+        set arr([$obj getName]) [$obj set componentid]
+    }
+}
+IDE::ConfigurationMap instproc setNewestEdtions {} {
+    set list [list]
+    foreach c [my getComponents] {
+        set cname [$c getName]
+        set id 0
+        set ncomp ""
+        foreach c [::IDE::ConfigmapControler getComponentEdition $cname] {
+            set nid [$c set componentid]
+            if {$nid>$id} {
+                set id nid
+                set ncomp $c
+            }
+        }
+        if {$ncomp ne ""} {
+            lappend list $ncomp     
+        }
+    }
+    my setComponents $list
+}
+IDE::ConfigurationMap instproc updateVersion {} {
+    my instvar configmapid basedon
+    set basedon $configmapid
+    my makePersistent
+    # we have new id also forgetDBMapping and make new relationship rows
+    # in relation-mapping table
+    [self]::childconigmaps forgetDBMapping
+    [self]::components forgetDBMapping
+    [self]::childconigmaps updateList
+    [self]::components updateList
+}
+@ IDE::ConfigurationMap instproc versionDisplay {} {
+description {This method create new edition of config map.
+It have another mining than createNewEdition that
+rather morph one instance to new edition. This method
+create new instance this new edition based on [self] object
+}
+}
+IDE::ConfigurationMap instproc versionDisplay {} {
+    if {[my set isclosed]} {
+        set v "V "
+    } else {
+        set v {}
+    }
+    return "$v[my set timestamp]"
+}
+IDE::ConfigurationMap instproc viewInfo {} {
+    IDE::VersionInfoView showVersionInfo [self]
+}
+IDE::ConfigurationMap proc initDescriptor {} {
+    set des [IDE::DBMapping [self]::descriptor -table Configmap -idColumn configmapid -cached 1]
+    $des addColumn {name varchar(50) name name}
+    $des addColumn {basedon int}
+    $des addColumn {timest timestamp(14) getTimeStamp setTimeStamp}
+    $des addColumn {versioninfo varchar(30)}
+    $des addColumn {userid int getUserId}
+    $des addColumn {isclosed bool}
+    $des addColumn {prescript text}
+    $des addColumn {postscript text}
+    IDE::DBInfo addInfoToDescriptor $des
+    
+    $des addRelationship [IDE::DBRelMappingNM new -childof $des -name childconigmaps -targetClass IDE::ConfigurationMap -relationTable ConfigmapChildren -sourceName configmapid -targetName configmapchildid -orderIndexName loadorder]
+
+    $des addRelationship [IDE::DBRelMappingNM new -childof $des -name components -targetClass IDE::ComponentConfWrapper -relationTable ConfigmapComponent -sourceName configmapid -targetName componentid -orderIndexName loadorder]
+}
+IDE::ConfigurationMap proc initFromDB {columns values componentid} {
+    my new
+}
+IDE::ConfigurationMap proc initializeAfterLoad {} {
+    my initDescriptor
+    IDE::ComponentConfWrapper initDescriptor
+}
+@ Class IDE::ConfigurationMapGroup {
+description {Helper class to hold all version of one logic configurationmap name
+(with same name) as Instance.
+It is used only for display in list and has no additional
+functionality
+}
+}
+Class IDE::ConfigurationMapGroup -parameter name
+@ ::IDE::ConfigurationMapGroup idemeta component IDEConfiguration
+@ Class IDE::EditionChooser {
+description {This dialog is used to ask user for selecting
+one item from groups from items. It is used
+to select component version. It can be also used
+for another items.
+Requirments: Items are objects that support protocol nameVersion}
+}
+Class IDE::EditionChooser -superclass {::IDE::DialogHelper ::IDE::Browser} -parameter {versions selected}
+@ ::IDE::EditionChooser idemeta component IDEConfiguration
+IDE::EditionChooser instproc closeWindow {} {
+}
+IDE::EditionChooser instproc getTitle {} {
+    return "Choose Edition"
+}
+IDE::EditionChooser instproc postOk {} {
+    my set result [[self]::@versions getSelectedObjects]
+}
+IDE::EditionChooser instproc specificInit {} {
+    my instvar win versionsArr
+    
+    IDE::ListViewEvent create [self]::@versions $win.versions -nameMethod nameVersion -width 40
+    
+    frame $win.b
+    button $win.b.ok -text OK -command [list [self] actionOk]
+    button $win.b.cancel -text Cancel -command [list [self] actionCancel]
+    
+    pack $win.b.ok $win.b.cancel -side left
+
+    [self]::@versions setObjectsList [my versions]
+    [self]::@versions setSelectedObject [my selected]
+    
+    pack $win.versions -fill both -expand yes
+    pack $win.b -fill x
+    next
+}
+IDE::EditionChooser proc getVersion {editions selected} {
+    set instance [my new [Object autoname .vchooser] -versions $editions -selected $selected]
+    $instance suspendUntilSignal
+    set ret [$instance getResult]
+    $instance destroy
+    return $ret
+}
+@ Class IDE::EditionsMultiChooser {
+description {Complex dialog to specify groups of many components}
+}
+Class IDE::EditionsMultiChooser -superclass {::IDE::DialogHelper ::IDE::Browser} -parameter {names versions selected}
+@ ::IDE::EditionsMultiChooser idemeta component IDEConfiguration
+IDE::EditionsMultiChooser instproc addItems {} {
+    set sobj [[self]::@versions getSelectedObjects]
+    if {$sobj eq ""} return
+    [self]::@adds insertObjectAt $sobj end
+    [self]::@names removeObject [my set selectedGroup]
+    [self]::@versions setObjectsList {}
+}
+IDE::EditionsMultiChooser instproc closeWindow {} {
+}
+IDE::EditionsMultiChooser instproc getTitle {} {
+    return "Choose Elements and Versions to Add"
+}
+IDE::EditionsMultiChooser instproc postOk {} {
+    my set result [[self]::@adds getObjectsList]
+}
+IDE::EditionsMultiChooser instproc removeItems {} {
+    set sobj [[self]::@adds getSelectedObjects]
+    if {$sobj eq ""} return
+    [self]::@adds removeObject $sobj
+    set name [$sobj name]
+    foreach group [my names] {
+        if {[$group name]==$name} {
+            [self]::@names insertObjectAt $group end
+            break
+        }
+    }
+}
+IDE::EditionsMultiChooser instproc selectName {{mobject {}}} {
+    my instvar versionsArr
+    if {$mobject eq ""} return
+    my set selectedGroup $mobject
+    [self]::@versions setObjectsList $versionsArr([$mobject name])
+}
+IDE::EditionsMultiChooser instproc specificInit {} {
+    my instvar win versionsArr
+    
+    IDE::ListViewEvent create [self]::@names $win.names -nameMethod name -actionHandler [self]
+    IDE::ListViewEvent create [self]::@versions $win.versions -nameMethod versionDisplay
+    IDE::ListViewEvent create [self]::@adds $win.addslist -nameMethod nameVersion
+
+    button $win.add -text >> -command [list [self] addItems]
+    button $win.remove -text << -command [list [self] removeItems]
+
+    [self]::@versions addEventInteres [self] addItems buttonDoublePush
+    [self]::@adds addEventInteres [self] removeItems buttonDoublePush
+    
+    frame $win.b
+    button $win.b.ok -text OK -command [list [self] actionOk]
+    button $win.b.cancel -text Cancel -command [list [self] actionCancel]
+    
+    pack $win.b.ok $win.b.cancel -side left
+
+    [self]::@names setObjectsList [my names]
+    [self]::@names addEventInteres [self] selectName selectedObject
+    array set versionsArr [my versions]
+    
+    grid $win.names -row 0 -column 0 -sticky news -rowspan 2
+    grid $win.versions -row 0 -column 1 -sticky news -rowspan 2
+    grid $win.addslist -row 0 -column 3 -sticky news -rowspan 2
+    grid $win.add -row 0 -column 2
+    grid $win.remove -row 1 -column 2
+    grid $win.b -row 2 -column 0 -sticky ew -columnspan 4
+    grid rowconfigure $win 0 -weight 1
+    grid columnconfigure $win 0 -weight 1
+    grid columnconfigure $win 1 -weight 1
+    grid columnconfigure $win 3 -weight 1
+    next
+}
+IDE::EditionsMultiChooser proc getVersions {names versions} {
+    set instance [my new [Object autoname .vchooser] -names $names -versions $versions]
+    $instance suspendUntilSignal
+    set ret [$instance getResult]
+    $instance destroy
+    return $ret
+}
+@ Class IDE::ListViewEvent {
+description {This List view is prepared to work with xotck objects as lists elements.
+It has also an actions interface and send events.
+You can specify test method that cause that items are displayed hightlighted.
+The interface is specified per parameters
+
+isMarkedMethod - specify test method that 
+nameMethod - method that will be call to object to get name for displaying. If none printString method will be used
+actionHandler - if definied will be called to item to determine menus for popdown menu.}
+}
+Class IDE::ListViewEvent -superclass {::IDE::ListView ::IDE::EventHandlerMix} -parameter {nameMethod isMarkedMethod actionHandler}
+@ ::IDE::ListViewEvent idemeta categories {objects-interface private actions}
+@ ::IDE::ListViewEvent idemeta categoriesMethods {{setSelectedObject getSelectedObjects insertObjectAt setObjectsList getObjectsList removeObject} {selectItem init refreshLabels} {invokeActionCommand invokeAction}}
+@ ::IDE::ListViewEvent idemeta component IDEConfiguration
+IDE::ListViewEvent instproc buttonDoublePush {} {
+    next
+    my signalEvent buttonDoublePush
+}
+IDE::ListViewEvent instproc getObjectsList {} {
+    my set objectsList
+}
+IDE::ListViewEvent instproc getSelectedObjects {} {
+    my instvar objectsList
+    set ret {}
+    foreach i [my selectedIndex] {
+        lappend ret [lindex $objectsList $i]
+    }
+    return $ret
+}
+IDE::ListViewEvent instproc init window {
+    next
+    bind $window.listbox <ButtonPress-3> [list [self] invokeAction %X %Y]
+    my set objectsList {}
+    my set sobject {}
+}
+IDE::ListViewEvent instproc insertObjectAt {obj pos} {
+    my instvar objectsList
+    set objectsList [linsert $objectsList $pos $obj]
+    my addItemAt [$obj [my nameMethod]] $pos
+}
+IDE::ListViewEvent instproc invokeAction {x y} {
+    if {![my exists actionHandler] || [my actionHandler] eq ""} return
+    my instvar sobject
+    set actions [[my actionHandler] getActions [self] $sobject]
+    if {$actions eq ""} return
+    set m [my set win].listbox.popmenu
+    ::destroy $m
+    menu $m -tearoff 0
+    foreach act $actions {
+        set actname [lindex $act 0]
+        set state [lindex $act 1]
+        if {$state eq ""} {set state normal}
+        $m add command -label $actname -command [list [self] invokeActionCommand $actname] -state $state
+    }
+   
+    tk_popup $m $x $y
+}
+IDE::ListViewEvent instproc invokeActionCommand action {
+    [my actionHandler] invokeAction $action [self] [my set sobject]
+}
+IDE::ListViewEvent instproc refreshLabels {} {
+    foreach obj [my set objectsList] {
+        lappend elems [$obj [my nameMethod]]
+    }
+    my setListUnsorted $elems
+}
+IDE::ListViewEvent instproc removeObject obj {
+    my instvar objectsList
+    set i [lsearch -exact $objectsList $obj]
+    if {$i<0} return
+    set objectsList [lreplace $objectsList $i $i]
+    my removeItemAt $i
+}
+IDE::ListViewEvent instproc selectItem item {
+    my instvar sobject
+    set sobject [lindex [my set objectsList] [my set selectedIndex]]
+    my signalEvent selectedObject $sobject
+}
+IDE::ListViewEvent instproc setObjectsList objects {
+    my set objectsList $objects
+    my set sobject {}
+    set elems {}
+    foreach obj $objects {
+        lappend elems [$obj [my nameMethod]]
+    }
+    my setListUnsorted $elems
+    if {[my exists isMarkedMethod]} {
+        my instvar win
+        set x 0
+        foreach obj $objects {
+            if {[$obj [my isMarkedMethod]]} {
+                $win.listbox itemconfigure $x -background red
+            }
+            incr x
+        }
+    }
+}
+IDE::ListViewEvent instproc setSelectedObject object {
+    set index [lsearch [my set objectsList] $object]
+    if {$index>=0} {
+        my setSelectedIndex $index 0
+    } else {
+        error "no object in the list"
+    }
+}
+Object IDE::ConfigmapControler
+@ ::IDE::ConfigmapControler idemeta categoriesMethodsProcs {{refreshGroupView setView} {changeViewType editSave updateText} {createNewVersion versionCMapEdition addNewConfigmap reloadConfigmaps changeEdtion browseChanges createNewGroup selectGroup selectVersion} {addConfigmap initializeAfterLoad initConfigmaps} {addNewComponent updateSelectedVersion} {getActions setActions invokeAction}}
+@ ::IDE::ConfigmapControler idemeta categoriesProcs {view-control scripts-actions configmap-actions initialize component-actions actions-handling}
+@ ::IDE::ConfigmapControler idemeta component IDEConfiguration
+IDE::ConfigmapControler proc addConfigmap cmap {
+    my instvar configmapArr
+    ide::addToValueForKeyAt configmapArr [$cmap name] $cmap 0
+}
+IDE::ConfigmapControler proc addNewComponent {} {
+    my instvar componentGroups componentArr selectedVersion
+    # remove already selected components
+    set snames [ide::lcollect each [${selectedVersion}::components getList] {$each name}]
+    foreach cgroup $componentGroups {
+        set name [$cgroup name]
+        if {![ide::lcontain $snames $name]} {
+            lappend fcomponentGroups $cgroup 
+            set fcomponentArr($name) $componentArr($name)
+        }
+    }
+    set objs [IDE::EditionsMultiChooser getVersions $fcomponentGroups [array get fcomponentArr]]
+    foreach obj $objs {
+        [my set view]::components insertObjectAt $obj end
+        ${selectedVersion}::components insertObjectAt $obj end
+    }
+}
+IDE::ConfigmapControler proc addNewConfigmap {} {
+    my instvar configmapGroups configmapArr selectedVersion
+    set snames [$selectedVersion getCMapsNamesDeep]
+    foreach cgroup $configmapGroups {
+        set name [$cgroup name]
+        if {[$selectedVersion name]==$name} continue
+        if {![ide::lcontain $snames $name]} {
+            lappend fconfigmapGroups $cgroup 
+            set fconfigmapArr($name) $configmapArr($name)
+        }
+    }
+    set objs [IDE::EditionsMultiChooser getVersions $fconfigmapGroups [array get fconfigmapArr]]
+    foreach obj $objs {
+        [my set view]::cmaps insertObjectAt $obj 0
+        ${selectedVersion}::childconigmaps insertObjectAt $obj 0
+    }
+}
+IDE::ConfigmapControler proc browseChanges object {
+    my instvar configmapArr view
+    if {[llength $configmapArr([$object name])]==1} {
+        IDE::Dialog message "No another edition to compare"
+    }
+    set newobject [IDE::EditionChooser getVersion $configmapArr([$object name]) $object]
+    if {$newobject eq "" || $object==$newobject} return
+    IDE::CMapsChangesBrowser compareCMaps $object $newobject
+}
+IDE::ConfigmapControler proc changeEdtion {object type} {
+    if {$type eq "components"} {
+        my instvar componentArr
+        set newobject [IDE::EditionChooser getVersion $componentArr([$object name]) $object]
+    } else {
+        my instvar configmapArr
+        set newobject [IDE::EditionChooser getVersion $configmapArr([$object name]) $object]
+    }
+    my instvar view selectedVersion
+    if {$newobject eq "" || $object==$newobject} return
+    set list [${view}::${type} getObjectsList]
+    set id [lsearch -exact $list $object]
+    set list [lreplace $list $id $id $newobject]
+    ${view}::${type} setObjectsList $list
+    if {$type eq "components"} {
+        ${selectedVersion}::components setList $list
+    } else {
+        ${selectedVersion}::childconigmaps setList $list
+    }
+}
+IDE::ConfigmapControler proc changeViewType type {
+    my set viewType $type
+    my updateText
+}
+IDE::ConfigmapControler proc createNewGroup {} {
+    my instvar configmapArr
+    set name [IDE::IDialogEntry getValueWithCancel "give name for new config map"]
+    if {$name eq "_cancel" || $name eq ""} return
+    if {[ide::lcontain [array names configmapArr] $name]} {
+        IDE::Dialog error "the name $name already exists"
+        return
+    }
+    set inst [IDE::ConfigurationMap new -name $name]
+    $inst makePersistent
+    ide::addToValueForKey configmapArr $name $inst
+    my lappend configmapGroups [IDE::ConfigurationMapGroup new -name $name]
+    my refreshGroupView
+}
+IDE::ConfigmapControler proc createNewVersion cmap {
+    set inst [$cmap copyAndCreateNewEdition]
+    ide::addToValueForKey configmapArr [$cmap name] $inst
+    my selectGroup [my set selectedGroup]
+}
+IDE::ConfigmapControler proc editSave text {
+    my instvar selectedVersion view viewType
+    switch $viewType {
+        Comment {
+            $selectedVersion setComment $text
+        }
+        preStartScript {
+            $selectedVersion prescript $text
+            $selectedVersion updateAttributes prescript
+        }
+        startScript {
+            $selectedVersion postscript $text
+            $selectedVersion updateAttributes postscript
+        }
+    }
+}
+IDE::ConfigmapControler proc getActions {view element} {
+    my instvar actionsMaps
+    set actions {}
+    set type [namespace tail $view]
+    
+    set desc $actionsMaps($type)
+    
+    foreach d $desc {
+        foreach {action denab} $d {
+            set state active
+            foreach ed $denab {
+                set state disabled
+                switch $ed {
+                    selection {
+                        if {$element ne ""} {set state active}
+                    }
+                    isVersioned {
+                        if {[$element set isclosed]} {set state active}
+                    }
+                    cmapIsEdition {
+                        if {![[my set selectedVersion] isclosed]} {
+                            set state active
+                        }
+                    }
+                    selectVersion {
+                        if {[my set selectedVersion] ne ""}  {set state active}
+                    }
+                    canVersion {
+                        if {[$element canVersion]} {set state active}
+                    }
+                }
+                if {$state eq "disabled"} break
+            }
+            lappend actions [list $action $state]
+        }
+    }
+    return $actions
+}
+IDE::ConfigmapControler proc getComponentEdition name {
+    my instvar componentArr
+    return $componentArr($name)
+}
+IDE::ConfigmapControler proc initConfigmaps args {
+    my instvar configmapGroups configmapArr componentGroups componentArr
+    if {[my exists configmapGroups]} return
+    set configmaps [IDE::ConfigurationMap::descriptor createInstancesFromWhere IDE::ConfigurationMap {} {}]
+    set configmapGroups {}
+    if {$configmaps ne ""} {
+        foreach cmap $configmaps {
+            my addConfigmap $cmap
+        }
+        foreach name [lsort [array names configmapArr]] {
+            lappend configmapGroups [IDE::ConfigurationMapGroup new -name $name]
+        }
+    }
+    # load all components version
+    set components [IDE::ComponentConfWrapper::descriptor createInstancesFromWhere IDE::ComponentConfWrapper {} {}]
+    set componentGroups {}
+    if {$components eq ""} return
+    foreach comp $components {
+        ide::addToValueForKeyAt componentArr [$comp set name] $comp 0
+    }
+    foreach name [lsort [array names componentArr]] {
+        lappend componentGroups [IDE::ComponentGroup new -name $name]
+    }
+}
+IDE::ConfigmapControler proc initializeAfterLoad {} {
+    if {$::xotcl::version>=1.3} {
+        my mixin add IDE::EventHandlerMix
+    } else {
+        my mixinappend IDE::EventHandlerMix
+    }
+}
+IDE::ConfigmapControler proc invokeAction {action view object} {
+    set type [namespace tail $view]
+    switch $action {
+        {new Configmap} {my createNewGroup}
+        add {
+            switch $type {
+                components {my addNewComponent}
+                cmaps {my addNewConfigmap}
+            }
+        }
+        {import from map} {
+            if {[$object importFromMap]} {
+                [my set view]::components setObjectsList [$object getComponents]
+            }
+        }
+        {check order} {
+            if {[$object reorderComponents]} {
+                [my set view]::components setObjectsList [$object getComponents]
+            }
+
+        }
+        {export to map} {
+            $object exportToMap
+        }
+        {open in Map Browser} {
+            $object openInConfigurationsMapBrowser
+        }
+        {save as packages} {
+            $object saveAsPackages
+        }
+        changes {my browseChanges $object}
+        remove {
+            $view removeObject $object
+            switch $type {
+                components {
+                    [my set selectedVersion]::components removeObject $object
+                }
+                cmaps {
+                    [my set selectedVersion]::childconigmaps removeObject $object
+                }
+            }
+        }
+        version {my versionCMapEdition $object; $view refreshLabels}
+        load {$object load; IDE::System signalComponentsChanged}
+        {load and run} {$object loadAndRun; IDE::System signalComponentsChanged}
+        info {$object viewInfo}
+        inspect {$object inspect}
+        view {$object viewEdition}
+        {new edition} {
+            set nconf [$object copyAndCreateNewEdition]
+            $view insertObjectAt $nconf 0
+            my addConfigmap $nconf
+        }
+        {release other} {
+            switch $type {
+                components {my changeEdtion $object components}
+                cmaps {my changeEdtion $object cmaps}
+            }
+        }
+        {set newest editions} {
+            $object setNewestEdtions
+            my selectVersion $object
+        }
+    }
+}
+IDE::ConfigmapControler proc refreshGroupView {} {
+  [my set view]::names setObjectsList [my set configmapGroups]
+}
+IDE::ConfigmapControler proc reloadConfigmaps {} {
+    my selectGroup {}
+    catch {
+        my unset configmapGroups configmapArr componentGroups componentArr
+    }
+    IDE::ObjectCache destroyInstancesOfClass IDE::ConfigurationMap
+    IDE::ObjectCache destroyInstancesOfClass IDE::ComponentConfWrapper
+    my initConfigmaps
+    my refreshGroupView
+}
+IDE::ConfigmapControler proc selectGroup {{sgroup {}}} {
+    my instvar selectedGroup configmapArr
+    my selectVersion {}
+    set selectedGroup $sgroup
+    if {$selectedGroup eq ""} {
+        [my set view]::versions setObjectsList {}
+        return
+    }
+    [my set view]::versions setObjectsList $configmapArr([$sgroup name])
+}
+IDE::ConfigmapControler proc selectVersion {{sversion {}}} {
+    my instvar selectedVersion view viewType
+    my updateSelectedVersion
+    set selectedVersion $sversion
+    if {$selectedVersion eq ""} {
+        ${view}::components setObjectsList {}
+        ${view}::cmaps setObjectsList {}
+        ${view}::text setText {}
+        ${view}::text makeEmpty
+    } else {
+        ${view}::components setObjectsList [$sversion getComponents]
+        ${view}::cmaps setObjectsList [$sversion getCMaps]
+        my updateText
+    }
+}
+IDE::ConfigmapControler proc setActions {} {
+    if {[my exists actionsMaps]} return
+
+    my array set actionsMaps {
+        names {{{new Configmap}}}
+        versions {
+                {version {selection canVersion}}
+                {{new edition} {selection isVersioned}}
+                {{import from map} selection}
+                {{export to map} {selection}}
+                {{open in Map Browser} {selection}}
+                {{save as packages} {selection}}
+                {changes selection}
+                {{set newest editions} {selection cmapIsEdition}}
+                {load selection}
+                {{load and run} selection}
+                {{load all} selection}
+                {{check order} {selection cmapIsEdition}}
+                {info selection}
+                {inspect selection}
+            }
+        components {
+                {add {selectVersion cmapIsEdition}}
+                {remove {selection cmapIsEdition}}
+                {{release other} {selection cmapIsEdition}}
+                {load selection}
+                {info selection}
+                {view selection}
+                {inspect selection}
+            }
+        cmaps {
+                {add {selectVersion cmapIsEdition}}
+                {remove {selection cmapIsEdition}}
+                {{release other} {selection cmapIsEdition}}
+            }
+     }
+}
+IDE::ConfigmapControler proc setView tview {
+   my instvar view configmapGroups
+   my set selectedVersion {}
+   my setActions 
+   set view $tview
+   ${view}::names actionHandler [self]
+   ${view}::names nameMethod name
+   ${view}::names addEventInteres [self] selectGroup selectedObject
+   
+   ${view}::versions actionHandler [self]
+   ${view}::versions nameMethod versionDisplay
+   ${view}::versions addEventInteres [self] selectVersion selectedObject
+
+   ${view}::components actionHandler [self]
+   ${view}::components isMarkedMethod isActualLoaded
+   ${view}::components nameMethod nameVersion
+   
+   ${view}::cmaps actionHandler [self]
+   ${view}::cmaps nameMethod nameVersion
+
+
+   $view addEventInteres [self] changeViewType changeViewType
+   my set viewType Comment
+
+   my initConfigmaps
+   my refreshGroupView
+}
+IDE::ConfigmapControler proc updateSelectedVersion {} {
+    my instvar selectedVersion view
+    if {$selectedVersion eq ""} return
+    ${selectedVersion}::components updateList
+    ${selectedVersion}::childconigmaps updateList
+    set selectedVersion {}
+}
+IDE::ConfigmapControler proc updateText {} {
+    my instvar selectedVersion view viewType
+    if {$selectedVersion eq ""} return
+    switch $viewType {
+        Comment {
+            set text [$selectedVersion getComment]
+        }
+        preStartScript {
+            set text [$selectedVersion prescript]
+        }
+        startScript {
+            set text [$selectedVersion postscript]
+        }
+    }
+    ${view}::text setTextControler $text [self]
+}
+IDE::ConfigmapControler proc versionCMapEdition cmap {
+   if {[$cmap canVersion]} {
+       $cmap versionEdition
+   }
+}
+IDE::ConfigurationMap initializeAfterLoad
+IDE::ConfigmapControler initializeAfterLoad
+

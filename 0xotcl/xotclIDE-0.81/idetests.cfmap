@@ -1,0 +1,6 @@
+set preStartScript {}
+set componentsToLoad {IDETestFramework
+IDETests
+}
+set startScript {IDE::TestBrowser newBrowser}
+

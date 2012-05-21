@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title></title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<style>
+#nave {
+	position: absolute;
+}
+#fundo {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+}
+
+</style>
+
+<script>
+var nave = null
+var nave_x = -100
+var nave_y = -100
+
+function anima() {
+	if (nave === null) {
+		nave = document.getElementById('nave')
+	}
+	nave_x += 3
+	nave_y += 2
+	nave.style.left = nave_x + 'px'
+	nave.style.top = nave_y + 'px'
+	if (nave_y < 430 ) {
+		setTimeout('anima()',20)
+	}	
+}
+
+</script>
+</head>
+<body onload="anima()" >
+
+<div id="fundo">
+<img src="earthrise800x520.jpg" 
+     width="800" height="520" border="0" alt="Nascer da Terra">
+</div>   
+<div id="nave">
+<img src="lem.png" width="62" height="56" border="0" alt="">
+</div>
+
+</body>
+</html>

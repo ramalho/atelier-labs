@@ -1,0 +1,24 @@
+<html>
+<body bgcolor="#777777">
+<div id="sliderR" style="position:absolute; top:10px; left:10px; width:80px; height:512px;">  </div>
+<div id="sliderG" style="position:absolute; top:10px; left:100px; width:80px; height:512px;">  </div>
+<div id="sliderB" style="position:absolute; top:10px; left:190px; width:80px; height:512px;">  </div>
+<div id="amostra" style="position:absolute; top:10px; left:280px; width:512px; height:512px; background-color:#000000"> </div>
+<script>
+function degrade(cor){
+    var slider=document.getElementById('slider'+cor);
+    for(var i=0; i<256; i++){
+        var div=document.createElement('div');
+        if      (cor=='R'){div.style.backgroundColor="rgb("+i+",0,0)"}
+        else if (cor=='G'){div.style.backgroundColor="rgb(0,"+i+",0)"}
+        else if (cor=='B'){div.style.backgroundColor="rgb(0,0,"+i+")"};
+        div.style.height="1px";
+        slider.appendChild(div)
+    }   
+}
+degrade("R");
+degrade("G");
+degrade("B");
+</script>
+</body>
+</html>

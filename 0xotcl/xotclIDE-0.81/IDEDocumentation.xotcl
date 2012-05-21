@@ -1,0 +1,562 @@
+# automatically generated from XOTclIDE
+# script require component {IDEView IDECore IDEBaseGUI}
+@ Component IDEDocumentation {
+description {This component contains 2 tools
+1. CommentScanner - for extract all # comments from old tcl/xotcl code that are not maintained by XOTclIDE
+2. Htmml Documentation Generator - Generate html documentation for selecting components using xotclide stucture and appending additional comments}
+}
+package provide IDEDocumentation 0.79
+package require IDEBaseGUI
+package require IDECore
+package require IDEView
+@ Class IDE::CommentScanerBrowser {
+description {The comment scanner can be used by importing old tcl/xotcl source to XOTclIDE.
+The problem is that # comments that are written before method are class
+headers are lost be loading (source) scripts.
+XOTclIDE use @ (metacommand) for specifing comments (see xotcl documentation).
+This tool read scripts and extraxt # comments to internal XOTclIDE comments.
+}
+}
+Class IDE::CommentScanerBrowser -superclass ::IDE::Browser
+@ ::IDE::CommentScanerBrowser idemeta categories {scaning comment-setting}
+@ ::IDE::CommentScanerBrowser idemeta categoriesMethods {{skipComment scaneFile getComment setComment getCommand} {setCommentInstprocClass setCommentObjectClass setCommentProc setCommentProcObject}}
+@ ::IDE::CommentScanerBrowser idemeta component IDEDocumentation
+IDE::CommentScanerBrowser instproc changeDir {} {
+    my readDir [IDE::Dialog getDir]
+}
+IDE::CommentScanerBrowser instproc createSystemMenu {} {
+    # no system menu
+}
+IDE::CommentScanerBrowser instproc getCommand {} {
+    my instvar handler pLine commandBody
+    set pLine [my skipEmptyLines $pLine]
+    set commandBody $pLine
+    append commandBody \n
+    while {![eof $handler] && ![info complete $commandBody]} {
+        append commandBody [gets $handler] \n
+    }
+}
+IDE::CommentScanerBrowser instproc getComment {} {
+    my instvar handler pLine commentBody
+    set commentBody {}
+    set line [string trim [gets $handler]]
+    while {![eof $handler] && $line ne "" && [string index $line 0] eq "#"} {
+        append commentBody [string trimleft $line "\#\t "] \n
+        set line [string trim [gets $handler]]
+    }
+    set pLine $line
+}
+IDE::CommentScanerBrowser instproc getTitle {} {
+   return "# Comment Scaner"
+}
+IDE::CommentScanerBrowser instproc readDir {{dir {}}} {
+    my instvar win actualDir
+    set actualDir $dir
+    $win.dir.dirname configure -text $dir
+    set names [ide::lcollect each [glob [file join $dir *]] {set each [file tail $each]}]
+    [self]::files setList $names
+}
+IDE::CommentScanerBrowser instproc scane {} {
+    my instvar importedComments
+    set importedComments 0
+    set files [[self]::files selectedItem]
+    foreach file $files {
+        my scaneFile $file
+    }
+    IDE::Dialog message "[llength $files] was scaned, $importedComments imperted comments"
+}
+IDE::CommentScanerBrowser instproc scaneFile file {
+    my instvar handler actualDir
+    set handler [open [file join $actualDir $file] r]
+    my skipComment
+    while {![eof $handler]} {
+        my getCommand
+        my setComment
+        my getComment
+    }
+    close $handler
+}
+IDE::CommentScanerBrowser instproc selectAll {} {
+   [self]::files addSelection 0 end
+}
+IDE::CommentScanerBrowser instproc selectTcl {} {
+   set list [[self]::files getList]
+   set index 0
+   foreach item $list {
+       if {[string match *.tcl $item] || [string match *.xotcl $item]} {
+           [self]::files addSelection $index $index
+       }
+       incr index
+   }
+}
+IDE::CommentScanerBrowser instproc setComment {} {
+    my instvar commentBody commandBody
+    puts "c $commandBody # $commentBody"
+    set commentBody [string trim $commentBody]
+    if {$commentBody eq "" || $commandBody eq ""} return
+    set first [lindex $commandBody 0]
+    set second [lindex $commandBody 1]
+    set third [lindex $commandBody 2]
+    if {$first eq "proc"} {
+        my setCommentProc
+    } elseif {$first eq "Object" || $first eq "Class"} {
+        my setCommentObjectClass
+    } elseif {$second eq "proc"} {
+        my setCommentProcObject
+    } elseif {$second eq "instproc"} {
+        my setCommentInstprocClass
+    }
+    set commentBody {}
+}
+IDE::CommentScanerBrowser instproc setCommentInstprocClass {} {
+    my instvar commentBody commandBody
+    set class [lindex $commandBody 0]
+    set name [lindex $commandBody 2]
+    if {![Object isclass $class] || [$class info instprocs $name] eq ""} {
+        my warningMessage "Class $class method $name not found"
+    } else {
+        $class setMethodComment Instance $name $commentBody
+        my incr importedComments
+    }
+}
+IDE::CommentScanerBrowser instproc setCommentObjectClass {} {
+    my instvar commentBody commandBody
+    set object [lindex $commandBody 1]
+    if {![Object isobject $object]} {
+        my warningMessage "Object $object not found"
+    } else {
+        $object setComment $commentBody
+        my incr importedComments
+    }
+}
+IDE::CommentScanerBrowser instproc setCommentProc {} {
+    my instvar commentBody commandBody
+    set name [lindex $commandBody 1]
+    set desc [IDE::TclProcsDescription getMethodFor $name]
+    if {$desc eq ""} {
+        my warningMessage "proc $name not registered"
+    } else {
+        $desc setComment $commentBody
+        my incr importedComments
+    }
+}
+IDE::CommentScanerBrowser instproc setCommentProcObject {} {
+    my instvar commentBody commandBody
+    set object [lindex $commandBody 0]
+    set name [lindex $commandBody 2]
+    if {![Object isobject $object] || [$object info procs $name] eq ""} {
+        my warningMessage "Object $object method $name not found"
+    } else {
+        $object setMethodComment Class $name $commentBody
+        my incr importedComments
+    }
+}
+IDE::CommentScanerBrowser instproc skipComment {} {
+    my getComment
+    my set commentBody {}
+}
+IDE::CommentScanerBrowser instproc skipEmptyLines line {
+    my instvar handler
+    while {[string trim $line] eq ""} {
+        if {[gets $handler line] == -1} {
+            break
+        }
+    }
+    return $line
+}
+IDE::CommentScanerBrowser instproc specificInit {} {
+    my instvar win
+
+    message $win.message -text "This tool try to extract the standart tcl comment # (just before procedure header) from choosen files and set them as XotclIDE comments.\nYou can use this tool just after importing xotcl stuff to xotclide" -width 350
+    
+    frame $win.sel
+    frame $win.dir
+    
+    button $win.scane -text Scane -command [list [self] scane]
+    button $win.sel.all -text "All files" -command [list [self] selectAll]
+    button $win.sel.allTcl -text "All tcl files" -command [list [self] selectTcl]
+    button $win.dir.changedir -text "Change Dir" -command [list [self] changeDir]
+    label $win.dir.dirname -relief sunken -border 2 -width 50 -anchor w
+        
+    IDE::ListView create [self]::files $win.files -multiselect 1
+    
+    pack $win.dir.dirname -fill x -expand yes -side left
+    pack $win.dir.changedir -side left
+    pack $win.sel.all $win.sel.allTcl -side left
+    pack $win.message  -fill x
+    pack $win.dir -anchor w -fill x
+    pack $win.files -fill both -expand yes
+    pack $win.sel $win.scane -anchor w
+    
+    my readDir
+}
+IDE::CommentScanerBrowser instproc warningMessage text {
+    Transcript warning $text
+}
+IDE::CommentScanerBrowser proc newBrowser {} {
+  return [my new [Object autoname .commScaner]]
+}
+@ Class IDE::DocGenerator {
+description {Base classe for generation html documnetation.
+}
+}
+Class IDE::DocGenerator -parameter {{ignorePrivate 0} {ignoreNoCommented 0}}
+@ ::IDE::DocGenerator idemeta component IDEDocumentation
+IDE::DocGenerator instproc generate {} {
+   my instvar outdir fileName
+   set mf [open [file join [my getOutDir] $fileName] w]
+   puts $mf [subst -nobackslashes [my pageContent]]
+   close $mf
+}
+IDE::DocGenerator instproc getOutDir {} {
+    return {}
+}
+Class IDE::DocGeneratorComponent -superclass ::IDE::DocGenerator -parameter {componentObj fileName mainObject}
+@ ::IDE::DocGeneratorComponent idemeta component IDEDocumentation
+IDE::DocGeneratorComponent instproc componentComment {} {
+   set text "<h2>Component [[my componentObj] getName]</h2>\n"
+   set comment [[my componentObj] getComment]
+   if {$comment ne ""} {
+       append text "<b>comment:</b><pre>$comment</pre>"
+   }
+   return $text
+}
+IDE::DocGeneratorComponent instproc contentClass class {
+    set ind 0
+    set text "<a name=\"class_$class\">\n<h3>Class $class</h3>\n"
+    if {[$class info parameter] ne ""} {
+        append text "parameter: [$class info parameter]<br>\n"
+    }
+    set scs [$class info superclass]
+    if {$scs ne "::xotcl::Object"} {
+        append text "<b>superclasses:</b>\n"
+        foreach sc $scs {
+            append text [my linkToObject $sc]
+        }
+        append text </br>        
+    }
+    set scs [$class info subclass]
+    if {$scs ne ""} {
+        append text "<b>subclasses:</b>\n"
+        foreach sc $scs {
+            append text [my linkToObject $sc]
+        }
+        append text </br>        
+    }
+    set comment [$class getComment]
+    if {$comment ne ""} {
+        append text "<b>comment:</b><pre>$comment</pre><p>\n"
+    }
+    foreach m [lsort [$class info instprocs]] {
+        set comment [$class getMethodComment Instance $m]
+        if {$comment eq "" && [my ignoreNoCommented]} continue
+        if {!$ind} {
+            append text "Instprocs:<dl>\n"
+            set ind 1
+        }
+        append text "<dt><b>$m</b> {[$class info instargs $m]}</dt>\n"
+        if {$comment ne ""} {
+            append text <dd>$comment</dd>\n
+        }
+    }
+    if {$ind} {append text {</dl>} \n}
+    append text [my contentObjectProcs $class]
+    return $text
+}
+IDE::DocGeneratorComponent instproc contentClasses {} {
+    set text {}
+    foreach class [lsort [[my componentObj] getClasses]] {
+        append text [my contentClass $class] <hr> \n
+    }
+    return $text
+}
+IDE::DocGeneratorComponent instproc contentList args {
+    my instvar componentObj
+    set text {}
+    set ind 0
+    foreach class [lsort [$componentObj getClasses]] {
+        if {!$ind} {
+            append text "Classes <ul>\n"
+            set ind 1
+        }
+        append text "<li>[my localLinkToObject $class]</li>\n"
+    }
+    if {$ind} {
+        append text "</ul> \n"
+        append text "Classes Hierarchy <ul>\n"
+        foreach tree [$componentObj getClassesHierarchy] {
+            append text [my makeClassesHierarchyList $tree]
+        }
+        append text "</ul>\n"
+    }
+    set ind 0
+    foreach object [lsort [$componentObj getObjects]] {
+        if {!$ind} {
+            append text "Objects <ul>\n"
+            set ind 1
+        }
+        append text "<li>[my localLinkToObject $object]</li>\n"
+    }
+    if {$ind} {append text {</ul>} \n}
+    set ind 0
+    foreach pgroup [lsort [$componentObj getProcsGroups]] {
+        if {!$ind} {
+            append text "Procsgroups <ul>\n"
+            set ind 1
+        }
+        append text "<li><a href=\"#pgroup_$pgroup\">$pgroup</a></li>\n"
+    }
+    if {$ind} {append text {</ul>} \n}
+    return $text
+}
+IDE::DocGeneratorComponent instproc contentObject object {
+    set ind 0
+    set text "<a name=\"object_$object\">\n<h3>Object $object</h3>\n"
+    set comment [$object getComment]
+    if {$comment ne ""} {
+        append text "<b>comment:</b><pre>$comment</pre><p>\n"
+    }
+    append text [my contentObjectProcs $object]
+    return $text
+}
+IDE::DocGeneratorComponent instproc contentObjectProcs class {
+    set ind 0
+    set text {}
+    foreach m [lsort [$class info procs]] {
+        set comment [$class getMethodComment Class $m]
+        if {$comment eq "" && [my ignoreNoCommented]} continue
+        if {!$ind} {
+            append text "Procs:<dl>\n"
+            set ind 1
+        }
+        append text "<dt><b>$m</b> {[$class info args $m]}</dt>"
+        if {$comment ne ""} {
+            append text <dd>$comment</dd>\n
+        }
+    }
+    if {$ind} {append text {</dl>} \n}
+    return $text
+}
+IDE::DocGeneratorComponent instproc contentObjects {} {
+    set text {}
+    foreach obj [lsort [[my componentObj] getObjects]] {
+        append text [my contentObject $obj] <hr> \n
+    }
+    return $text
+}
+IDE::DocGeneratorComponent instproc contentProc group {
+    set ind 0
+    set text "<a name=\"pgroup_[$group name]\">\n<h3>Procsgroup [$group name]</h3>\n"
+    set comment [$group getComment]
+    if {$comment ne ""} {
+        append text "<b>comment:</b><pre>$comment</pre><p>\n"
+    }
+    foreach m [lsort [$group getProcsNames]] {
+        set pobj [$group getProcObjForName $m]
+        set comment [$pobj getComment]
+        if {$comment eq "" && [my ignoreNoCommented]} continue
+        if {!$ind} {
+            append text "Methods:<dl>\n"
+            set ind 1
+        }
+        append text "<dt><b>$m</b> {[info args $m]}</dt>\n"
+        if {$comment ne ""} {
+            append text <dd>$comment</dd>\n
+        }
+    }
+    if {$ind} {append text {</dl>} \n}
+}
+IDE::DocGeneratorComponent instproc contentProcs {} {
+    set text {}
+    foreach obj [lsort [[my componentObj] getProcsGroupsObjects]] {
+        append text [my contentProc $obj] <hr> \n
+    }
+    return $text
+}
+IDE::DocGeneratorComponent instproc getOutDir {} {
+  [my mainObject] getOutDir
+}
+IDE::DocGeneratorComponent instproc getTitle {} {
+   [my componentObj] getName
+}
+IDE::DocGeneratorComponent instproc linkToObject obj {
+    set name [string trimleft $obj :]
+    if {[$obj getCompObject]==[[my componentObj] selfName]} {
+        return "<a href=\"#class_$name\">$name</a>\n"
+    } else {
+        if {[ide::lcontain [[my mainObject] components] [$obj getComponentName]]} {
+            return "<a href=\"[[my mainObject] fileNameForComponent [$obj getCompObject]]#class_$name\">$name</a>\n"
+        }
+    }
+    return $name\n
+}
+IDE::DocGeneratorComponent instproc localLinkToObject obj { 
+   set name [string trimleft $obj :]
+   if {[Object isclass $obj]} {
+       return "<a href=\"#class_$obj\">$name</a>"
+   } else {
+       return "<a href=\"#object_$obj\">$name</a>"
+   }
+}
+IDE::DocGeneratorComponent instproc mainPageLink {} {
+    return "<a href=\"[[my mainObject] fileName]\">Contents</a><hr>"
+}
+IDE::DocGeneratorComponent instproc makeClassesHierarchyList classes {
+   set text "<li>[my localLinkToObject [lindex $classes 0]]</li>"
+   set i 0
+   foreach subtree [lrange $classes 1 end] {
+       if {!$i} {
+           append text "<ul>\n"
+           set i 1
+       }
+       append text [my makeClassesHierarchyList $subtree]
+   }
+   if {$i} { append text "</ul>\n" }
+   return $text
+   
+   
+}
+IDE::DocGeneratorComponent instproc pageContent {} {
+  return {<html>
+<title>[my getTitle]</title>
+<body>
+[my mainPageLink]
+[my componentComment]
+[my contentList]
+<hr>
+[my contentClasses]
+[my contentObjects]
+[my contentProcs]
+</body>
+</html>
+}
+}
+@ Class IDE::DocGeneratorMain {
+description {Used to genarate main index documentation page (index.html)}
+}
+Class IDE::DocGeneratorMain -superclass ::IDE::DocGenerator -parameter {components {fileName index.html} {outdir {}}}
+@ ::IDE::DocGeneratorMain idemeta component IDEDocumentation
+IDE::DocGeneratorMain instproc componentsList {} {
+    my instvar components
+    set listCont {}
+    foreach comp $components {
+        append listCont [my generateDocForComponent $comp] \n
+    }
+    return $listCont
+}
+IDE::DocGeneratorMain instproc fileNameForComponent cobj {
+    return [$cobj standardFileNameBase].html
+}
+IDE::DocGeneratorMain instproc generate {} {
+   my set components [IDE::Component orderComponents [my set components]]
+   next
+}
+IDE::DocGeneratorMain instproc generateDocForComponent component {
+    my instvar outdir ignorePrivate ignoreNoCommented
+    set cobj [IDE::Component getCompObjectForNameIfExist $component]
+    if {$cobj eq ""} return
+    set fname [my fileNameForComponent $cobj]
+    set cg [IDE::DocGeneratorComponent new -volatile -componentObj $cobj -fileName $fname -mainObject [self] -ignorePrivate $ignorePrivate -ignoreNoCommented $ignoreNoCommented]
+    $cg generate
+    return "<li><a href=\"$fname\">$component</a>"
+}
+IDE::DocGeneratorMain instproc getOutDir {} {
+    my outdir
+}
+IDE::DocGeneratorMain instproc getTitle {} {
+    return {XotclIDE Documenation}
+}
+IDE::DocGeneratorMain instproc getUserName args {
+   if {[Object isobject IDE::User]} { 
+       return [[IDE::User getDefault] getName]
+   } else  {
+       return unknown
+   }
+}
+IDE::DocGeneratorMain instproc pageContent {} {
+  return {<html>
+<title>[my getTitle]</title>
+<body>
+<big>[my getTitle]</big>
+<ul>
+[my componentsList]
+</ul>
+Generated by [my getUserName]<br>
+Generated on [clock format [clock seconds]]
+</body>
+</html>
+}
+}
+@ Class IDE::HtmlGeneratorBrowser {
+description {GUI for specifing html documentation generation}
+}
+Class IDE::HtmlGeneratorBrowser -superclass ::IDE::Browser
+@ ::IDE::HtmlGeneratorBrowser idemeta component IDEDocumentation
+IDE::HtmlGeneratorBrowser instproc changeDir {} {
+   my set actualDir [IDE::Dialog getDir]
+   [my set win].dir.dirname configure -text [my set actualDir]
+}
+IDE::HtmlGeneratorBrowser instproc createSystemMenu {} {
+    # no system menu
+}
+IDE::HtmlGeneratorBrowser instproc excludeIDE {} {
+    set idecore [concat [IDE::System getCoreComponentsAll] [IDE::System getExtraComponents]]
+    foreach index [[self]::components selectedIndex] item [[self]::components selectedItem] {
+        if {[ide::lcontain $idecore $item]} {
+            [self]::components removeSelection $index $index
+        }
+    }
+}
+IDE::HtmlGeneratorBrowser instproc generate {} {
+    set components [[self]::components selectedItem]
+    if {$components eq ""} {
+        IDE::Dialog message "No componets selected"
+        return
+    }
+    set dg [IDE::DocGeneratorMain new -volatile -components $components -outdir [my set actualDir] -ignorePrivate [my set ignorePrivateCategory] -ignoreNoCommented [my set ignoreNoCommented]]
+    $dg generate
+}
+IDE::HtmlGeneratorBrowser instproc readComponents {} {
+   [self]::components setList [IDE::IntroProxy getComponents]
+}
+IDE::HtmlGeneratorBrowser instproc selectAll {} {
+   [self]::components addSelection 0 end
+}
+IDE::HtmlGeneratorBrowser instproc specificInit {} {
+    my instvar win
+
+    my set actualDir {}
+    my requireNamespace
+    
+    message $win.message -text "This tool genarate html documentation from comments and sturcture of choosen components. The documentation will be a set of html files with main entry page index.html" -width 350
+    
+    frame $win.sel
+    frame $win.dir
+    
+    button $win.generate -text Generate -command [list [self] generate]
+    button $win.sel.all -text "All Components" -command [list [self] selectAll]
+    button $win.sel.allTcl -text "Exclude IDE Components" -command [list [self] excludeIDE]
+    button $win.dir.changedir -text "Change Dir" -command [list [self] changeDir]
+    label $win.dir.dirname -relief sunken -border 2 -width 50 -anchor w
+        
+    checkbutton $win.igncategory -text "ignore private category" -variable [self]::ignorePrivateCategory
+    checkbutton $win.ignnocommented -text "ignore no commented methods" -variable [self]::ignoreNoCommented
+    
+    IDE::ListView create [self]::components $win.files -multiselect 1
+    
+    pack $win.dir.dirname -fill x -expand yes -side left
+    pack $win.dir.changedir -side left
+    pack $win.sel.all $win.sel.allTcl -side left
+    pack $win.message  -fill x
+    pack $win.dir -anchor w -fill x
+    pack $win.files -fill both -expand yes
+    pack $win.igncategory -anchor w
+    pack $win.ignnocommented -anchor w
+    pack $win.sel $win.generate -anchor w
+    
+    my readComponents
+}
+IDE::HtmlGeneratorBrowser proc newBrowser {} {
+  return [my new [Object autoname .commentscan]]
+}
+

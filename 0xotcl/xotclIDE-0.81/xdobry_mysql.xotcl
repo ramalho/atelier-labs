@@ -1,0 +1,267 @@
+# automatically generated from XOTclIDE
+# script require component xdobry::sql
+@ Component xdobry::mysql {
+description {XOTcl API for mysqltcl based on mysqltcl (www.xdobry.de/mysqltcl)}
+}
+package provide xdobry::mysql 0.75
+package require xdobry::sql
+@ Class MySql {
+description {Interfaceclass for mysqltcl base interface}
+}
+Class MySql -superclass ::Sqlinterface -parameter {
+    user
+    password
+    hostname
+    socket
+    {interface mysql}
+}
+@ ::MySql idemeta categories {mysql-specific private interface constans meta-api api schema-api}
+@ ::MySql idemeta categoriesMethods {{setdb getinsertid} {} {} {dateFormat getDatabaseArgumentName} {} {connect createDatabase disconnect execute getdblist insertRowAutoId query queryList getconnectargs isConnected returnAffectedRows escape} {getColumns getTables extract_table}}
+@ ::MySql idemeta component xdobry::mysql
+MySql instproc connect par_list {
+    my instvar handle connected dbank user password hostname  socket
+    array set par_array $par_list
+    set par ""
+    if {[info exists par_array(user)] && $par_array(user) ne ""} {
+        lappend par -user $par_array(user) 
+        set user $par_array(user) 
+    }
+    if {[info exists par_array(password)] && $par_array(password) ne ""} {
+        lappend par -password $par_array(password) 
+        set password $par_array(password) 
+    }
+    if {[info exists par_array(hostname)] && $par_array(hostname) ne ""} {
+        lappend par -host $par_array(hostname) 
+        set hostname $par_array(hostname) 
+    }
+    if {[info exists par_array(socket)] && $par_array(socket) ne ""} {
+        lappend par -socket $par_array(socket) 
+        set socket $par_array(socket) 
+    }
+    if {[info exists par_array(dbank)] && $par_array(dbank) ne ""} {
+        lappend par -db $par_array(dbank) 
+        set dbank $par_array(dbank)
+    }
+
+    # Kein Tcl-Fehler Abfang
+    if {[catch {set sqlhandle [eval mysqlconnect $par]} err]!=0} {
+        my errorMessage $err
+        return 0
+    }
+    set connected 1
+    set handle $sqlhandle
+    return 1
+}
+MySql instproc createDatabase dbname {
+    if {[my execute "CREATE DATABASE $dbname"] eq ""} {return 0}
+    if {[my setdb $dbname] eq ""} {return 0}
+    return 1
+}
+MySql instproc dateFormat date {
+     return "DATE_FORMAT($date,'%d.%m.%Y %T')"
+}
+MySql instproc disconnect {} {
+    mysqlclose [my set handle]
+    my set connected 0
+}
+MySql instproc escape string {
+    return [mysqlescape $string]
+}
+MySql instproc execute sqlstatement {
+    my instvar handle
+    if {[catch {set ret [mysqlexec $handle $sqlstatement]} err]} {
+        my errorMessage $err
+        return
+    }
+    return $ret
+}
+MySql instproc extract_table {visitor table} {
+    array set typeconv [my getTypeConvert]
+    
+    set qhandle [my query "describe $table"]
+    while {[set attr [$qhandle fetch]] ne ""} {
+	set alist {}
+	keylset alist name [lindex $attr 0]
+	# Der Typ wird in der Form angegeben typ(length) z.B varchar(20)
+	# Hier wird er in zwei Attribute gespalten
+	if {[regexp {([a-z]+)\((.+)\)} [lindex $attr 1] _ typ length]} {
+	    set type $typ
+	    if {$typ eq "enum" || $typ eq "set"} {
+		set vl {}
+		foreach it [split $length ,] {
+		    lappend vl [string trim $it '\"]
+		}
+		keylset alist valuelist $vl
+	    } else {
+		keylset alist length $length
+	    }
+	} else {
+	    set type [lindex $attr 1]
+	}
+       if {[info exists typeconv($type)]} {
+             set type $typeconv($type)
+        }
+        keylset alist type $type
+	if {[lindex $attr 2] eq "YES"} {
+	    keylset alist null 1
+	}
+	if {[lindex $attr 3] eq "PRI"} {
+	    keylset alist primary_key 1
+	}
+	if {[lindex $attr 4] ne ""} {
+	    keylset alist default [lindex $attr 4]
+	}
+	if {[lindex $attr 5] eq "auto_increment"} {
+	    keylset alist auto_increment 1
+	}
+	$visitor newattribute $alist
+    }
+    $qhandle destroy
+}
+MySql instproc getColumns table {
+   mysqlcol [my set handle] $table name
+}
+MySql instproc getDatabaseArgumentName {} {
+    return dbank
+}
+MySql instproc getTables {} {
+   mysqlinfo [my set handle] tables
+}
+MySql instproc getTypeConvert {} {
+    list tinyint smallint mediumint int bigint int date datetime tinyblob longblob mediumblob longblob blob longblob tinytext text mediumtext text time datetime
+}
+MySql instproc getconnectargs {} {
+    global env
+    if {[info exists env(USERNAME)]} {
+        set user $env(USERNAME)
+    } else {
+        set user ""
+    }
+    return [list  {hostname text localhost}  {socket text {}}  {port integer 3306}  [list user text $user]  {password password {}}  {dbank text {}}
+            ]
+           
+}
+MySql instproc getdblist {} {
+    mysqlinfo [my set handle] databases
+}
+MySql instproc getinsertid {} {
+    mysqlinsertid [my set handle]
+}
+MySql instproc insertRowAutoId {table columns values {primarykey {}} {sequenzer {}}} {
+    my insertRow $table $columns $values
+    
+    my getinsertid
+}
+MySql instproc isConnected {} {
+   expr {[my exists connected] && [my set connected]}
+}
+MySql instproc isNull value {
+    ::mysql::isnull $value
+}
+MySql instproc maskTableName tableName {
+    string map {" " _} $tableName
+}
+MySql instproc query sqlstatment {
+    my instvar handle
+    if {[catch {set qhandle [mysqlquery $handle $sqlstatment]} err]} {
+        my errorMessage $err
+        return
+    }
+    set rows [mysqlresult $qhandle rows]
+    return [MySql::SqlQuerry new -childof [self] -qhandle $qhandle -frows $rows]
+}
+MySql instproc queryList sqlstatement {
+    my instvar handle
+    if {[catch {set ret [mysqlsel $handle $sqlstatement -list]} err]} {
+        my errorMessage $err
+        return
+    }
+    return $ret
+}
+MySql instproc returnAffectedRows {} {
+    return 1
+}
+MySql instproc setdb dbname {
+    my instvar handle dbank
+    if {[catch {mysqluse $handle $dbname} err]!=0} {
+        global errorInfo
+        puts "$err $errorInfo"
+        set dbank {}
+        return
+    }
+    set dbank $dbname
+}
+MySql proc initializeAfterLoad {} {
+    MySql set interface mysql
+}
+MySql proc initializeInterface {{prefs package}} {
+   global errorInfo
+
+   if {$prefs eq "package"} {
+       if {![catch {package require mysqltcl}]} return
+       puts stderr "can not load package mysqltcl $errorInfo"
+       set prefs /usr/lib/mysqltcl/libmysqltcl.so
+   }
+   if {[catch "load $prefs"]} {
+       puts stderr "can not load library $prefs $errorInfo"
+   }
+}
+MySql proc setConnection {name file defaults} {
+    # Try to set connection descibed in pref file
+    if {[file exists $file]} {
+        set preffile [open $file r]
+        while {[gets $preffile Zeile] >= 0} {
+            if {[lindex $Zeile 0] eq "connection"} {
+               set prefs [lindex $Zeile 1]
+               break
+            }
+        }
+        if {$prefs eq ""} { set prefs $defaults }
+    } else {
+       set prefs $defaults
+    }
+    MySql $name
+    $name connect $prefs
+}
+Class MySql::SqlQuerry -parameter {
+    {qhandle 0}
+    {frows 0}
+}
+@ ::MySql::SqlQuerry idemeta component xdobry::mysql
+@ MySql::SqlQuerry instproc columnNames {} {
+description {Return the name of columns in the query.
+Warning! This method are not supported by all interfaces}
+}
+MySql::SqlQuerry instproc columnNames {} {
+    mysqlcol [my set qhandle] -current name
+}
+MySql::SqlQuerry instproc destroy {} {
+    mysqlendquery [my set qhandle]
+    next
+}
+@ MySql::SqlQuerry instproc fetch {} {
+description {fetch next row and return it as list.
+Warning!
+The result is always a list.
+If the reusult has only one column that it is list with only
+one element at should be accessed with lindex $row 0}
+}
+MySql::SqlQuerry instproc fetch {} {
+    mysqlnext [my set qhandle]
+}
+@ MySql::SqlQuerry instproc rows {} {
+description {Return the total number of rown in the result
+Warning! fetch does not decrease this number}
+}
+MySql::SqlQuerry instproc rows {} {
+    my set frows
+}
+@ MySql::SqlQuerry instproc seek {} {
+description {Can set the cursor in result object.
+Warning! not all interfaces supports this method}
+}
+MySql::SqlQuerry instproc seek point {
+    mysqlseek [my set qhandle] $point
+}
+MySql initializeAfterLoad
+

@@ -1,0 +1,214 @@
+# automatically generated from XOTclIDE
+# script require component {IDECore IDEView IDEPersistence IDEBaseGUI}
+@ Component IDERepositoryImporter {
+description {This tool can import Configmaps from foreign Repositories into
+own repository
+
+eval line below to start browser
+IDE::RepositoryImporter newBrowser}
+}
+package provide IDERepositoryImporter 0.74
+package require IDEBaseGUI
+package require IDECore
+package require IDEPersistence
+package require IDEView
+Class IDE::PersistenceCopy -superclass ::IDE::DBPersistence -parameter {descriptor connection}
+@ ::IDE::PersistenceCopy idemeta component IDERepositoryImporter
+IDE::PersistenceCopy instproc copyInstanceToDB {} {
+   if {[my exists userid]} {
+       my set userid [my getUserId]
+   }
+   if {[my exists basedon]} {
+       my set basedon {}
+   }
+   if {[my exists infoid] && [my set infoid] ne ""} {
+       my importComment
+   }
+   set des [my getDescriptor]
+   set columns [$des getColumns]
+   set values [my getInsertValues columns]
+   set keyvalue [[my getTargetConnection] insertRowAutoId [$des table] $columns $values [$des idColumn]]
+   my set newid $keyvalue
+}
+IDE::PersistenceCopy instproc getConnection {} {
+    my connection
+}
+IDE::PersistenceCopy instproc getDescriptor {} {
+    my descriptor
+}
+IDE::PersistenceCopy instproc getTargetConnection {} {
+     return  [IDE::DBPersistence set connection]
+}
+IDE::PersistenceCopy instproc importComment {} {
+    my instvar infoid exportRepository
+    set comment [lindex [lindex [[my getConnection] queryList "select text from Info where infoid=$infoid"] 0] 0]
+    set infoid [[my getTargetConnection] insertRowAutoId Info text [list $comment] infoid]
+}
+IDE::PersistenceCopy instproc importForId id {
+     set desc [my getDescriptor]
+     my set [$desc idColumn] $id
+     my rereadAttributes [$desc getColumns]
+}
+Class IDE::RepositoryImporter -superclass ::IDE::Browser
+@ ::IDE::RepositoryImporter idemeta component IDERepositoryImporter
+IDE::RepositoryImporter instproc connectRepository {} {
+    my instvar exportRepository win
+    my disconnectRepository
+    set exportRepository [IDEDBConnectDialog setConnectionOn {}]
+    if {[my isConnectedRepository]} {
+        $win.connectionlab configure -text "connected [$exportRepository set interface] - [$exportRepository set dbank]"
+        my refreshImportConfigmap
+    }
+}
+IDE::RepositoryImporter instproc createSystemMenu {} {
+    # no system menu
+}
+IDE::RepositoryImporter instproc destroy {} {
+    my disconnectRepository
+    next
+}
+IDE::RepositoryImporter instproc disconnectRepository {} {
+    my instvar exportRepository win configmaps_arr
+    if {[info exists exportRepository] && $exportRepository ne ""} {
+        $exportRepository destroy
+        set exportRepository ""
+        catch {unset configmaps_arr}
+    }
+    catch {
+        $win.connectionlab configure -text "disconnected"
+        [self]::confgrups setList {}
+        [self]::configmaps setList {}
+    }
+}
+IDE::RepositoryImporter instproc getDesc desc {
+    my instvar desc_arr
+    if {![info exists desc_arr($desc)]} {
+        set ndesc [IDE::DBMapping new -childof [self] -table [$desc table] -idColumn [$desc idColumn]]
+        set desc_arr($desc) $ndesc
+        foreach column [$desc set columns] {
+            $ndesc addColumn [lrange $column 0 1]
+        }
+    }
+    return $desc_arr($desc)
+}
+IDE::RepositoryImporter instproc getTitle {} {
+    return "Repository Importer"
+}
+IDE::RepositoryImporter instproc importComponent componentid {
+    my instvar exportRepository importRepository ignoreKnownComponents
+    set component [IDE::PersistenceCopy new -volatile -connection $exportRepository -descriptor [my getDesc IDE::ComponentPersistence::descriptor]]
+    $component importForId $componentid
+    if {$ignoreKnownComponents} {
+        if {[IDE::Component getCompObjectForNameIfExist [$component set name]] ne ""} {
+            return
+        }
+    }
+    $component copyInstanceToDB
+    set objects [$exportRepository queryList "select objectid,deforder from ComponentObject where componentid=$componentid order by deforder"]
+    set newid [$component set newid]
+    foreach object $objects {
+        set objectid [lindex $object 0]
+        set deforder [lindex $object 1]
+        set newobjid [my importObject $objectid]
+        $importRepository insertRow ComponentObject {componentid objectid deforder} [list $newid $newobjid $deforder]
+    }
+    return $newid
+}
+IDE::RepositoryImporter instproc importConfigmap configmapid {
+    my instvar exportRepository importRepository
+    set confmap [IDE::PersistenceCopy new -volatile -connection $exportRepository -descriptor [my getDesc IDE::ConfigurationMap::descriptor]]
+    $confmap importForId $configmapid
+    $confmap copyInstanceToDB
+    set components [$exportRepository queryList "select componentid,loadorder from ConfigmapComponent where configmapid=$configmapid order by loadorder"]
+    set newid [$confmap set newid]
+    foreach component $components {
+        set componentid [lindex $component 0]
+        set loadorder [lindex $component 1]
+        set newcompid [my importComponent $componentid]
+        if {$newcompid eq ""} {
+            continue
+        }
+        $importRepository insertRow ConfigmapComponent {configmapid componentid loadorder} [list $newid $newcompid $loadorder]
+    }
+    return $newid
+}
+IDE::RepositoryImporter instproc importMethod methodid {
+    my instvar exportRepository importRepository
+    set method [IDE::PersistenceCopy new -volatile -connection $exportRepository -descriptor [my getDesc IDE::MethodDescription::descriptor]]
+    $method importForId $methodid
+    $method copyInstanceToDB
+    return [$method set newid]
+}
+IDE::RepositoryImporter instproc importObject objectid {
+    my instvar exportRepository importRepository
+    set object [IDE::PersistenceCopy new -volatile -connection $exportRepository -descriptor [my getDesc IDE::ObjectDescription::descriptor]]
+    $object importForId $objectid
+    $object copyInstanceToDB
+    set methods [$exportRepository queryList "select methodid from ObjectMethod where objectid=$objectid"]
+    set newid [$object set newid]
+    foreach method $methods {
+        set methodid [lindex $method 0]
+        set newmethodid [my importMethod $methodid]
+        $importRepository insertRow ObjectMethod {objectid methodid} [list $newid $newmethodid]
+    }
+    return $newid
+}
+IDE::RepositoryImporter instproc importRepository {} {
+    my instvar exportRepository importRepository win
+    if {![my isConnectedRepository]} {
+        IDE::Dialog message "Connect to repository first"
+        return
+    }
+    set importRepository [IDE::DBPersistence set connection]
+    set sconfigmap  [[self]::configmaps selectedItemFirst]
+    if {$sconfigmap ne ""} {
+        set configmapid [lindex $sconfigmap 0]
+    } else {
+        return
+    }
+    my importConfigmap $configmapid
+    IDE::Dialog message "configmap has been imported"
+}
+IDE::RepositoryImporter instproc isConnectedRepository {} {
+    my instvar exportRepository
+    expr {[info exists exportRepository] && $exportRepository ne "" && [$exportRepository isConnected]}
+}
+IDE::RepositoryImporter instproc refreshImportConfigmap {} {
+    my instvar exportRepository configmaps_arr
+    set configmaps [$exportRepository queryList "select configmapid,name,timest,versioninfo from Configmap"]
+    foreach configmap $configmaps {
+        set name [lindex $configmap 1]
+        ide::addToValueForKey configmaps_arr $name $configmap
+    }
+    [self]::confgrups setList [lsort [array names configmaps_arr]]
+}
+IDE::RepositoryImporter instproc selectGroup item {
+    my instvar configmaps_arr
+    [self]::configmaps setList $configmaps_arr($item)
+}
+IDE::RepositoryImporter instproc specificInit {} {
+    my instvar win ignoreKnownComponents
+    my requireNamespace
+    frame $win.connectframe
+    button $win.connect -command [list [self] connectRepository] -text "Connect Repository"
+    label $win.connectionlab
+    button $win.disconnect -command [list [self] disconnectRepository] -text "Disonnect Repository"
+    IDE::NListView create [self]::confgrups $win.groups -notify [self] -notifyProc selectGroup -height 15
+    IDE::ListView create [self]::configmaps $win.configmap -height 15 -width 40
+    checkbutton $win.ignorecomponents -text "Ignore known components" -variable [self]::ignoreKnownComponents
+    button $win.import -command [list [self] importRepository] -text "Import"
+    pack $win.connect $win.disconnect $win.connectionlab -side left -in $win.connectframe
+    pack $win.connectframe -side top -anchor w
+    pack $win.import -anchor w -side bottom
+    pack $win.ignorecomponents -anchor w -side bottom
+    pack $win.groups $win.configmap -side left -expand yes -fill both
+    next
+}
+IDE::RepositoryImporter proc newBrowser {} {
+     if {![Object isobject IDE::ConfigurationMap]} {
+         IDE::Dialog message "Load ConfigurationMap Browser first"
+         return
+     }
+     return [my new [Object autoname .repimporter]]
+}
+

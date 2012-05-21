@@ -1,0 +1,36 @@
+First you need tcl tk
+http://www.tcl.tk
+Tcl is ofter already installed on many Linux systems
+and XOTcl
+http://www.xotcl.org
+
+Both you can install together getting
+ActiveState tcl packages.
+Available under:
+http://www.tcl.tk
+
+You can also use Tclkit or Startkit, that
+are packed tcl source with interpreter in one file (exe).
+The run-ready executable XOTclIDE are
+available under:
+http://www.xdobry.de/xotclIDE/xotclide_win.html
+for Windows and Linux.
+
+This programm do not need compilation.
+Starting by:
+
+1) change in xotclIDE-?? directory and start it by
+2) Type in console
+tclsh XotclIDE.tcl
+
+where tclsh is Tcl interpreter (I also can call tclsh8.4 on your system)
+
+On windows and installed ActiveState Tcl you only need
+to double click the file
+XotclIDE.tcl
+
+If you want to use version control system you must
+first install the repository.
+More information see in XOTclIDE User Guide
+available:
+http://www.xdobry.de/xotclIDE

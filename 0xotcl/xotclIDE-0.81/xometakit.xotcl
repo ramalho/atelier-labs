@@ -1,0 +1,99 @@
+# automatically generated from XOTclIDE
+# script require component xdobry::sql
+@ Component xometakit {
+description {This is pseudo SQL wrapper for Metakit
+It does not offer full sql support
+But is can be used from xdobry::sql framework to set and
+manage the connection
+
+Also some base functionality are supperted
+1) query tables (views)
+2) insert row
+
+It is used by XOTclIDE for using Metakit as version control database
+}
+}
+package provide xometakit 0.78
+package require xdobry::sql
+Class XOMetakit -superclass ::Sqlinterface -parameter {{interface Metakit}}
+@ ::XOMetakit idemeta component xometakit
+XOMetakit instproc closeUnitOfWork {} {
+    my instvar unitOfWork
+    incr unitOfWork -1
+    if {$unitOfWork<=0} {
+        my commit
+    }
+}
+XOMetakit instproc commit {{force 0}} {
+    my instvar handle unitOfWork
+    if {$force || $unitOfWork<=0} {
+        mk::file commit $handle
+    }
+}
+XOMetakit instproc connect par_list {
+    my instvar handle connected unitOfWork
+    set unitOfWork 0
+    set handle [Object autoname odbchandle]
+    array set par_array $par_list
+    foreach k [array names par_array] {
+         my set $k $par_array($k)
+    }
+    set metakit_file $par_array(metakit_file)
+    package require Mk4tcl
+    set handle [Object autoname metakit]
+    mk::file open $handle $metakit_file
+    my set dbank $metakit_file
+    set connected 1
+    return 1
+}
+XOMetakit instproc disconnect {} {
+    if {[my exists connected] && [my set connected]} {
+        my instvar handle
+        mk::file close $handle
+        my set connected 0
+   }
+}
+XOMetakit instproc getTables {} {
+    my instvar handle
+    set tables [list]
+    foreach t [mk::view info $handle] {
+        lappend tables [lindex [split $t :] 0]
+    }
+    return $tables
+}
+XOMetakit instproc getTimeStampFunction {} {
+    clock seconds
+}
+XOMetakit instproc getconnectargs {} {
+    return {{metakit_file file {}}}
+}
+XOMetakit instproc hasfunction func {
+    if {[[my info class] info instprocs $func] ne ""} {
+        return 1
+    }
+    return 0
+}
+XOMetakit instproc insertRow {table columns values {types {}}} {
+    my insertRowAutoId $table $columns $values
+}
+XOMetakit instproc insertRowAutoId {table columns values {primarykey {}} {sequenzer {}}} {
+    my instvar handle
+    set row [list]
+    foreach c $columns v $values {
+        lappend row $c $v
+    }
+    set rid [eval mk::row append $handle.$table $row]
+    my commit
+    set last [expr {[string last ! $rid]+1}]
+    string range $rid $last end
+}
+XOMetakit instproc openUnitOfWork {} {
+    my instvar unitOfWork
+    incr unitOfWork
+}
+XOMetakit instproc updateAttributesBase {table idcolumn id updateset} {
+    my instvar handle
+    eval mk::set $handle.$table!$id $updateset
+    my commit
+}
+

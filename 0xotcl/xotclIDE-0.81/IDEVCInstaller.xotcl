@@ -1,0 +1,420 @@
+# automatically generated from XOTclIDE
+# script require component {IDEView IDECore IDEPersistence IDEBaseGUI}
+@ Component IDEVCInstaller {
+description {VCInstaller is the GUI-tool for installation and
+configuration of IDE with Version Controll based on
+MySql relational database.
+}
+}
+package provide IDEVCInstaller 0.75
+package require IDEBaseGUI
+package require IDECore
+package require IDEPersistence
+package require IDEView
+Class IDE::DBMappingSchemaChange -superclass ::IDE::DBMapping
+@ ::IDE::DBMappingSchemaChange idemeta component IDEVCInstaller
+Class IDE::LabeledEntry -parameter label
+@ ::IDE::LabeledEntry idemeta component IDEVCInstaller
+IDE::LabeledEntry instproc getValue {} {
+    [self] instvar win
+    $win.entry get
+}
+IDE::LabeledEntry instproc init window {
+    [self] instvar win
+    set win $window
+    frame $win
+    ::label $win.label -text [[self] label]
+    ::entry $win.entry
+    [self] specificInit
+    [self] pack
+}
+IDE::LabeledEntry instproc pack {} {
+    [self] instvar win
+    pack $win.label $win.entry -side left
+}
+IDE::LabeledEntry instproc setValue value {
+    [self] instvar win
+    $win.entry delete 0 end
+    $win.entry insert 0 $value
+}
+IDE::LabeledEntry instproc specificInit {} {
+    next
+}
+Class IDE::FileNameEntry -superclass ::IDE::LabeledEntry -parameter label
+@ ::IDE::FileNameEntry idemeta component IDEVCInstaller
+IDE::FileNameEntry instproc fileChooser {} {
+   [self] setValue [IDE::Dialog getOpenFile]
+}
+IDE::FileNameEntry instproc pack {} {
+    [self] instvar win
+    next
+    pack $win.button -side left
+}
+IDE::FileNameEntry instproc specificInit {} {
+    [self] instvar win
+    ::button $win.button -text "..." -command [list [self] fileChooser]
+    next
+}
+@ Class IDE::InstallerGUI {
+description {This class implement the installer GUI and install actions
+The actions are specified im method initRun
+
+The transitions list are speciefie by list of 4 elements lists
+Elements:
+1. Set GUI method
+2. check GUI Parameters method (Return 0 or 1)
+3. set preferences or variables
+4. comment}
+}
+Class IDE::InstallerGUI -superclass ::IDE::Browser
+@ ::IDE::InstallerGUI idemeta categories {initialize private mysqltcl install-components welcome interface connection-params}
+@ ::IDE::InstallerGUI idemeta categoriesMethods {{createSystemMenu getTitle initRun init specificInit} cleanInputGUI {checkMysqlLibLocation mysqllibInputGUI setMysqlLib} {checkInstallComponents finalGUI installComponents} {welcomeGUI checkDummy setDummy} {setInterface selectInterfaceGUI checkInterface} {setSqlParam sqlParamGUI checkSqlParam installTables}}
+@ ::IDE::InstallerGUI idemeta component IDEVCInstaller
+IDE::InstallerGUI instproc checkDummy {} {
+    return 1
+}
+IDE::InstallerGUI instproc checkInstallComponents {} {
+   return 1
+}
+IDE::InstallerGUI instproc checkInterface {} {
+     my instvar win interface
+     set lb $win.inputframe.listbox
+     if {[set cur [$lb curselection]] eq ""} {
+        my installError "select interface first"
+        return 0
+     }
+     set interface [$lb get $cur]
+     Sqlinterface loadInterface $interface
+     return 1
+}
+IDE::InstallerGUI instproc checkMysqlLibLocation {} {
+   [self] instvar usepackage libfile
+   global errorInfo
+   if {$usepackage} {
+      if {[catch {package require mysqltcl}]} {
+         [self] installError "Error $errorInfo by loading package mysqltcl"
+         return 0
+      }
+   } else {
+      set libfile [[self]::libfile getValue]
+      if {![file exists $libfile]} {
+         [self] installError "Could not find $libfile"
+         return 0
+      }
+      if {[catch {load $libfile}]} {
+         [self] installError "Error $errorInfo by loading library $libfile"
+         return 0
+      }
+   }
+   return 1
+}
+IDE::InstallerGUI instproc checkSqlParam args {
+   my instvar paramFrame connection createDB
+   set args [$paramFrame getConnectArgs]
+   if {$createDB} {
+       set dbArgname [$connection getDatabaseArgumentName]
+       set cargs {}
+       foreach {key value} $args {
+           if {$key==$dbArgname} {
+               set dbname $value
+           } else {
+               lappend cargs $key $value
+           }
+       }
+       puts "cargs $cargs"
+       $connection connect $cargs
+       $connection createDatabase $dbname
+   } else {
+       $connection connect $args
+   }
+   return [my installTables]
+}
+IDE::InstallerGUI instproc cleanInputGUI {} {
+   [self] instvar win
+   foreach child [winfo children $win.inputframe] {
+       ::destroy $child
+   }
+}
+IDE::InstallerGUI instproc createSystemMenu {} {
+    # no system menu
+}
+IDE::InstallerGUI instproc doCancel {} {
+    if {[IDE::Dialog yesNo "Do you want to cancel the installation. No rollback will be done!"] eq "yes"} {
+        if {[Object isobject ::Transcript]} {
+            my destroy
+        } else {
+            exit
+        }
+    }
+}
+IDE::InstallerGUI instproc doFinish {} {
+    [self] instvar win
+    IDE::Dialog message {Installation of XotclIDE Control Version System is finished
+
+Please use 'XotclIDEDB' to Start IDE with VC
+Use 'XotclIDEFromDB.tcl' to develop IDE itself (It start IDE from Components in VC).
+
+Please report the Bugs!. Have a Fun with XotclIDE!}
+    [self] destroy
+    exit
+}
+IDE::InstallerGUI instproc doNext {} {
+   [self] instvar step runTransitions 
+   set tr [lindex $runTransitions $step]
+   if {[[self] [lindex $tr 1]]} {
+        [self] [lindex $tr 2]
+        incr step
+        if {[llength $runTransitions]<=$step} {
+           [self] doFinish
+        } else {
+           [self] showActualTransition
+        }
+   }
+}
+IDE::InstallerGUI instproc finalGUI {} {
+     [self] instvar win copyComponents saveParams
+     set saveParams 1
+     set copyComponents 1
+     set iw $win.inputframe
+     ::checkbutton $iw.copycomponents -text "Copy all IDE Components to VC" -variable [self]::copyComponents
+     ::checkbutton $iw.saveparams -text "Save Data as preferences" -variable [self]::saveParams
+     pack $iw.copycomponents $iw.saveparams -anchor w
+
+}
+IDE::InstallerGUI instproc getSchemaFile {} {
+   array set interfaceOpts {mysql schema_mysql.sql
+                     postgres schema_postgres.sql
+                     tclodbc schema_odbc.sql
+                     sqlite schema_sqlite.sql
+                     MSAccess schema_access.sql
+                     MSSql schema_mssql.sql
+                     Oracle schema_oracle.sql
+                     Metakit schema_metakit.sql}
+   return $interfaceOpts([my set interface])
+}
+IDE::InstallerGUI instproc getTitle {} {
+    return {Version Control Installer for XOTclIDE}
+}
+IDE::InstallerGUI instproc init win {
+   if {$win eq "."} {
+     frame .i
+     pack .i -fill both -expand yes
+     set win .i
+   }
+   next $win
+   [self] requireNamespace
+   [self] set step 0
+   [self] initRun
+   IDEPreferences loadPreferences
+   [self] showActualTransition
+}
+IDE::InstallerGUI instproc initRun {} {
+    # list of inputParameters test_proc install_proc description
+    [self] set runTransitions { 
+{welcomeGUI checkDummy setDummy  
+            {Welcome to Installation tool for XOTclIDE Version Control.
+
+This tool can configure your sql server connection, install the database, table schema and import all components.
+
+In this Version following sql server are supported
+1. mysql (by usining mysqltcl tcl interface lib see. 
+    http://www.xdobry.de/mysqltcl)
+2. postgresql - postgresql-tcl (destributed with postgresql - under RedHat install postgresql-tcl rpm package)
+3. odbc - tclodbc see http://www.sourceforge.org/projects/tclodbc
+4. sqlite - see http://www.sqlite.org (Adaptor Author Oleg Oleinick)
+5. MS SQL Jet (.mdb access files) Windows only throw odbc
+6. MS SQL Server (throw odbc)
+7. Oracle
+
+By Windows version are mysqltcl, tclodbc and sqlite included in binary distribution.
+
+To use Version Control in XotclIDE you need:
+1. Install and run your sql server.
+2. Check your user access to databes (connection parameters)
+3. For most sql-servers you need to create an empty new database. Only by mysql you can create new database from install program).
+4. For ODBC and MS SQL Server create a database source (with new empty database)
+}}
+
+{selectInterfaceGUI checkInterface setInterface  
+            {Select the tcl interface to connect your sql-server}}
+
+{sqlParamGUI checkSqlParam setSqlParam
+            {Specify the Sql connection parameters.
+The parameters are dependent from your sql interface. Check manuals for your database and/or your sql interface} }
+{finalGUI checkInstallComponents installComponents
+            { You can copy all XotclIDE components to Version Control. So you can start them directly by loading from Database (use start per 'CompLoaderDevelop'. 
+
+You will be asked for long name for your XotclIDE user. The short name is your unix system user name. It will be used to set the author of the copied components
+
+Set the second check box if you want to save your connection parameter to user preferences in file ~/.xotclide.
+Warning! Mysql password will be saved too} }
+    }
+}
+IDE::InstallerGUI instproc installComponents args {
+    [self] instvar copyComponents saveParams connection
+    if {$copyComponents} {
+      set compToInstall [concat [IDE::System getCoreComponents] [IDE::System getExtraComponents]]
+      IDE::DBPersistence initSchema
+      IDE::User initDefault
+      foreach p $compToInstall {
+        [self]::status setMessage "loading $p"
+        package require $p
+      }
+      [self]::status setMessage "computing components"
+      IDE::Component initFromInterpreter
+      IDE::CommentsContainer parseAndCleanMeta
+      IDE::CommentsContainer makeTclGroupsFromMeta
+      $connection openUnitOfWork
+      foreach p $compToInstall {
+          update idletasks
+          [self]::status setMessage "installing $p"
+          IDE::ComponentPersistence importComponent $p
+          set cobj [IDE::Component getCompObjectForName $p]
+          foreach obj [concat [$cobj getObjects] [$cobj getClasses] [$cobj getProcsGroupsObjects]] {
+             set desc [$obj getDescription]
+             $desc versionEdition
+          }
+          $cobj versionEdition
+      }
+      $connection closeUnitOfWork
+    }
+    if {$saveParams} {
+        IDEPreferences savePreferences
+    }
+    return 1
+}
+IDE::InstallerGUI instproc installError message {
+   IDE::Dialog message $message
+}
+IDE::InstallerGUI instproc installTables {} {
+    my instvar connection
+    if {[$connection hasfunction getTables] && [ide::lcontain [$connection getTables] Component]} {
+         IDE::Dialog message "The xotclide seems to be installed on the datebase. No action. If you want to reinstall them (system upgrade) then delete (drop) them first. Use update*.sql scripts for updating database schema"
+         return 1
+    }
+    set schemafile [my getSchemaFile]
+    set fh [open [file join [IDE::System getSystemDir] $schemafile] r]
+    set statements [read $fh]
+    if {[$connection istype XOMetakit]} {
+        set dbhandle [$connection set handle]
+        # metakit schema creation is simple Tcl script
+        eval $statements
+        return 1
+    }
+    # not all ; separate statements only ); and end;
+    # see schema_sqlite.sql for example for it
+    regsub -all {(\)\s*);} $statements \\1\0 statements
+    regsub -all {(?i)(\s+end\s*);} $statements \\1\0 statements
+    # mark if ;  is last element in the line
+    regsub -all {(?n);$} $statements \0 statements
+
+    foreach statement [split $statements \0] {
+       if {[string trim $statement] eq ""} continue
+       set ret [$connection execute $statement]
+       if {$ret eq ""} break
+    }
+    close $fh
+    if {$ret eq ""} {
+        my installError "Error by installing schema on database.\n [$connection errorMessage]\n$statement"
+    }
+    return [expr {$ret ne ""}]
+}
+IDE::InstallerGUI instproc mysqllibInputGUI {} {
+     [self] instvar win usepackage
+     set usepackage 1
+     set iw $win.inputframe
+     ::checkbutton $iw.usepackage -text "try to load package mysqltcl" -variable [self]::usepackage
+     IDE::FileNameEntry [self]::libfile $iw.libfile -label "mysqltcl.so location"
+     [self]::libfile setValue /usr/local/lib/libmysqltcl.so
+     pack $iw.usepackage $iw.libfile -anchor w
+}
+IDE::InstallerGUI instproc selectInterfaceGUI {} {
+    [self] instvar win
+    set frame $win.inputframe
+    
+    ::scrollbar $frame.scroll -command "$frame.listbox yview" -takefocus 0
+    ::listbox $frame.listbox -yscroll "$frame.scroll set" -exportselection no
+    pack $frame.scroll -side right -fill y
+    pack $frame.listbox -expand yes -fill both
+    
+    eval $frame.listbox insert 0 [Sqlinterface getInterfacesNamesCleaned]
+
+}
+IDE::InstallerGUI instproc setDummy {} {
+}
+IDE::InstallerGUI instproc setInterface {} {
+    my instvar interface connection
+    IDEPreferences setParameter interface $interface
+    set connection [[Sqlinterface loadInterface $interface] new]
+}
+IDE::InstallerGUI instproc setMysqlLib args {
+   my instvar usepackage libfile
+   if {$usepackage} {
+       IDEPreferences set preferences(mysqllib) package
+   } else {
+       IDEPreferences set preferences(mysqllib) $libfile
+   }
+}
+IDE::InstallerGUI instproc setSqlParam args {
+    my instvar paramFrame connection
+    IDE::DBPersistence setConnection $connection
+    IDEPreferences setParameter connection [$paramFrame getConnectArgs]
+}
+IDE::InstallerGUI instproc showActualTransition args {
+   [self] instvar step runTransitions
+   set tr [lindex $runTransitions $step]
+   [self] cleanInputGUI
+   [self]::info setText [lindex $tr 3]
+   [self] [lindex $tr 0]
+   
+}
+IDE::InstallerGUI instproc specificInit {} {
+    [self] instvar win
+    if {$win eq "."} {set win {}}
+    IDE::Text [self]::info $win.info -width 50 -height 20
+    [[self]::info getTextWindow] configure -wrap word
+    IDE::WorkStatus [self]::status $win.status
+    frame $win.inputframe
+    if {$win eq ".i"} {
+        wm protocol [winfo toplevel $win] WM_DELETE_WINDOW {}
+    }
+    button $win.next -text Next -command [list [self] doNext]
+    button $win.cancel -text Cancel -command [list [self] doCancel]
+
+    grid $win.info -row 0 -column 0 -sticky news
+    grid $win.inputframe -row 0 -column 1 -columnspan 2
+    grid $win.status -row 1 -column 0
+    grid $win.next -row 1 -column 1
+    grid $win.cancel -row 1 -column 2
+    grid rowconfigure $win 0 -weight 1
+    grid columnconfigure $win 0 -weight 1
+}
+IDE::InstallerGUI instproc sqlParamGUI args {
+    my instvar paramFrame connection win createDB
+    set frame $win.inputframe
+    set paramFrame [IDEDBConnectFrame new -win $frame.args -connectionObject $connection -connectArgs [IDEPreferences getDBLoginParameters] -writefile 1]
+    pack $frame.args
+    set createDB 0
+    if {[$connection hasfunction createDatabase]} {
+        ::checkbutton $frame.createDB -text "create new database" -variable [self]::createDB
+        ::pack $frame.createDB
+    }
+}
+IDE::InstallerGUI instproc welcomeGUI {} {
+}
+IDE::InstallerGUI proc start {} {
+   my new .install
+}
+Class IDE::WorkStatus
+@ ::IDE::WorkStatus idemeta component IDEVCInstaller
+IDE::WorkStatus instproc init window {
+   [self] instvar win
+   set win $window
+   ::label $win
+}
+IDE::WorkStatus instproc setMessage mes {
+   [self] instvar win
+   $win configure -text $mes
+   update idletasks
+}
+

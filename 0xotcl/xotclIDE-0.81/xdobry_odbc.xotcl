@@ -1,0 +1,256 @@
+# automatically generated from XOTclIDE
+# script require component xdobry::sql
+@ Component xdobry::odbc {
+description {XOTcl API for ODBC based on tclodbc (www.sourcefoge.net/projects/tclodbc)}
+}
+package provide xdobry::odbc 0.74
+package require xdobry::sql
+Class ODBC -superclass ::Sqlinterface  -parameter {{interface ODBC}}
+@ ::ODBC idemeta categories {private public-api schema-api}
+@ ::ODBC idemeta categoriesMethods {{getSequence getSequenceFromDB getdblist getTypeConvert} {disconnect queryList execute getconnectargs insertRowAutoId connect hasfunction query} {getColumns extract_table getTables}}
+@ ::ODBC idemeta component xdobry::odbc
+ODBC instproc connect par_list {
+    [self] instvar handle connected
+    set handle [Object autoname odbchandle]
+    array set par_array $par_list
+    foreach k [array names par_array] {
+         my set $k $par_array($k)
+    }
+    if {[info exist par_array(user)] && $par_array(user) ne "" && [info exist par_array(password)] && $par_array(password) ne ""} {
+	  database connect $handle $par_array(datasource) $par_array(user) $par_array(password)
+    } elseif {[info exist par_array(user)] && $par_array(user) ne ""} {
+	  database connect $handle $par_array(datasource) $par_array(user)
+    } else {
+	  database connect $handle $par_array(datasource)
+    }
+    my set dbank $par_array(datasource)
+    set connected 1
+    return 1
+}
+ODBC instproc disconnect {} {
+   if {[my exists connected] && [my set connected]} {
+        [my set handle] disconnect
+        my set connected 0
+   }
+}
+ODBC instproc execute statement {
+    if {[catch {[[self] set handle] $statement} err]} {
+        my errorMessage $err
+        return
+    }
+    return $err
+}
+ODBC instproc extract_table {visitor table} {
+    my instvar handle
+    # 0 TABLE_QUALIFIER
+    # 1 TABLE_OWNER
+    # 2 TABLE_NAME
+    # 3 COLUMN_NAME
+    # 4 DATA_TYPE
+    # 5 TYPE_NAME
+    # 6 PRECISION
+    # 7 LENGTH
+    # 8 SCALE
+    # 9 RADIX
+    # 10 NULLABLE
+    # 11 REMARKS
+    
+    # this array specify the conversion of types
+    array set typeconv [my getTypeConvert]
+    
+    # Unbekannt bleiben default value und primary key
+    foreach attr [$handle columns $table] {
+        set alist {}
+        keylset alist name [encoding convertfrom [lindex $attr 3]]
+        set type [string tolower [lindex $attr 5]]
+        # MSSQL produce something like that "numeric() identity"
+	if {[string match *identity $type]} {
+	     keylset alist primary_key 1
+             keylset alist auto_increment 1
+             regexp {^\w+} $type type
+        }
+        if {$type eq "counter" || $type eq "autovalue"} {
+            set type int
+            keylset alist auto_increment 1
+            keylset alist primary_key 1
+        }
+	if {[info exists typeconv($type)]} {
+             set type $typeconv($type)
+        }
+        keylset alist type $type
+        keylset alist null [lindex $attr 10]
+        if {$type eq "decimal"} {
+            # PRECISION
+            keylset alist length [lindex $attr 6]
+            # SCALE
+            keylset alist precision [lindex $attr 8]
+        } else {
+            keylset alist precision [lindex $attr 6]
+            if {$type eq "varchar"} {
+                keylset alist length [lindex $attr 6]
+            } else {
+                keylset alist length [lindex $attr 7]
+            }
+        }
+        $visitor newattribute $alist
+    }
+}
+ODBC instproc getColumns table {
+    my instvar handle
+    set ret {}
+    foreach cinfo [$handle columns $table] {
+        lappend ret [lindex $cinfo 3]
+    }
+    return $ret
+}
+ODBC instproc getSequence table {
+   my instvar sequenceCache
+    if {![info exists sequenceCache($table)]} {
+        set newid [my getSequenceFromDB $table 10]
+        set sequenceCache($table) [list $newid 10]
+        return $newid
+    }
+    set key $sequenceCache($table)
+    set lastid [expr {[lindex $key 0]+1}]
+    set count [lindex $key 1]
+    if {$count<=1} {
+        set newid [my getSequenceFromDB $table 10]
+        set sequenceCache($table) [list $newid 10]
+        return $newid
+    }
+    set sequenceCache($table) [list $lastid [expr {$count-1}]]
+    return $lastid
+}
+ODBC instproc getSequenceFromDB {table count} {
+    set try 0
+    # Use optimistic strategy for incrementic sequencer
+    # by using only 2 sql queries
+    while 1 {
+        set userkey [expr {round(rand()*32769)}]
+        my execute "update Mysequence set lastid=lastid+$count,userkey=$userkey where name='$table'"
+        set res [lindex [my queryList "select lastid,userkey from Mysequence where name='$table'"] 0]
+        set id [lindex $res 0]
+        set ruserkey [lindex $res 1]
+        if {$userkey==$ruserkey} break
+        incr try
+        if {$try>10} {error "can not get sequence from db"}
+        # Wait up to 3 secounds
+        after [expr {round(rand()*3000)}]
+   }
+   return [expr {$id - $count + 1}]
+}
+ODBC instproc getSources {} {
+    set ret [list]
+    foreach s [database datasources] {
+        lappend ret [lindex $s 0]
+    }
+    return $ret
+}
+ODBC instproc getTables {} {
+    my instvar handle
+    set ret {}
+    foreach tinfo [$handle tables] {
+         set type [lindex $tinfo 3]
+	   if {$type eq "SYSTEM TABLE" || $type eq "VIEW"} continue
+	   lappend ret [encoding convertfrom [lindex $tinfo 2]]
+    }
+    return $ret
+}
+ODBC instproc getTypeConvert {} {
+    list numeric decimal image longblob nvarchar varchar real float currency money longtext text longchar text memo text note text ntext text string varchar character varchar alphanumeric varchar integer int longbinary longblob general longblob binary longblob varbinary longblob logical boolean logical1 boolean yesno boolean bit boolean tinyint smallint interger1 smallint guid char
+}
+ODBC instproc getconnectargs {} {
+    list [list datasource list {} [my getSources]] {user text {}} {password password {}}
+}
+ODBC instproc getdblist {} {
+    [self] instvar handle
+    set ret {}
+    foreach tinfo [$handle datasources] {
+        lappend ret [lindex $tinfo 0]
+    }
+    return $ret
+}
+ODBC instproc hasfunction func {
+    set iclass ODBC::SqlQueryPuffer
+    if {[[my info class] info instprocs $func] ne ""} {
+        return 1
+    } 
+    
+    if {[$iclass info instprocs $func] ne ""} {
+        return 1
+    } else {
+        return 0
+    }
+}
+ODBC instproc insertRowAutoId {table columns values {primarykey {}} {sequenzer {}}} {
+    if {$sequenzer eq ""} {
+        set sequenzer ${table}_seq
+    }
+    if {$primarykey eq ""} {
+        set primarykey id
+    }
+    set idvalue [my getSequence $table]
+    lappend columns $primarykey
+    lappend values $idvalue
+    my insertRow $table $columns $values
+    return $idvalue
+}
+ODBC instproc query statement {
+    my instvar handle
+    if {0} { 
+	    set qname [Object autoname odbcquery]
+	    $handle statement $qname $statement
+	    $qname execute
+	    puts "executed $statement"
+	    return [ODBC::SqlQuery new  -qhandle $qname]
+    } else {
+          set data [my queryList $statement]
+          if {$data ne ""} {
+              return [ODBC::SqlQueryPuffer new [list -data $data] [list -position 0]]
+          } else {
+              return [ODBC::SqlQueryPuffer new [list -position -1]]
+          }
+    }
+}
+ODBC instproc queryList statement {
+    if {[catch {[[self] set handle] $statement} err]} {
+        my errorMessage $err
+        return
+    }
+    return $err
+}
+ODBC proc initializeInterface {{prefs package}} {
+    package require tclodbc
+}
+Class ODBC::SqlQuery -parameter qhandle
+@ ::ODBC::SqlQuery idemeta component xdobry::odbc
+ODBC::SqlQuery instproc destroy {} {
+   [[self] qhandle] drop
+}
+ODBC::SqlQuery instproc fetch {} {
+   [[self] qhandle] fetch
+}
+ODBC::SqlQuery instproc rows {} {
+   [[self] qhandle] rowcount
+}
+Class ODBC::SqlQueryPuffer -parameter {data position}
+@ ::ODBC::SqlQueryPuffer idemeta component xdobry::odbc
+ODBC::SqlQueryPuffer instproc fetch {} {
+    my instvar data position
+    if {$position<0} {
+        return 
+    }
+    set ret [lindex $data $position]
+    incr position
+    return $ret
+}
+ODBC::SqlQueryPuffer instproc rows {} {
+    if {[my set position]<0} {
+        return 0
+    }
+    llength [my data]
+}
+ODBC::SqlQueryPuffer instproc seek pos {
+    my position $pos
+}
+

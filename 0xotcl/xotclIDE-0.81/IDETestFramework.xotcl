@@ -1,0 +1,271 @@
+# automatically generated from XOTclIDE
+# script require component {IDEView IDECore IDEBaseGUI}
+@ Component IDETestFramework {
+description {This the framework for XP Tests
+
+One Test is one Klass derived from IDE::TestCase
+
+computing test:
+1. overwrite the method "startTest" to initialize test context
+2. all test method have pattern "test*". They will be invoked in
+   alphabeticall order.
+3. One test fail are registered if an error is droped.
+   The testing will be not stoped be errors.
+   You can also use method "stopTesting" for explizit stop the testing
+4. See Component IDETest for example tests.
+5. Use IDE::TestBrowser to run and see test results.}
+}
+package provide IDETestFramework 0.78
+package require IDEBaseGUI
+package require IDECore
+package require IDEView
+Class IDE::TestBrowser -superclass ::IDE::Browser
+@ ::IDE::TestBrowser idemeta component IDETestFramework
+IDE::TestBrowser instproc dropAllTests selected {
+}
+IDE::TestBrowser instproc dropSelectedTests selected {
+}
+IDE::TestBrowser instproc errorBrowser {} {
+   set errorText [[self]::errormessage getText]
+   if {$errorText ne ""} {
+     IDE::ErrorStack newBrowser $errorText
+   }
+}
+IDE::TestBrowser instproc initTestCases classes {
+   [self] instvar testCases errorCases
+   foreach old $testCases { $old destroy }
+   set testCases {}
+   set errorCases {}
+   foreach class $classes { lappend testCases [$class new -childof [self]] }
+   [self]::failedmethod setList {}
+   [self]::errormessage setText {}
+}
+IDE::TestBrowser instproc initTestCasesList {} {
+    [self]::testclasses setList [IDE::TestCase info subclass]
+}
+IDE::TestBrowser instproc inspectFailed {} {
+   [self] instvar selectedErrorCase
+   if {$selectedErrorCase ne "" && [Object isobject $selectedErrorCase]} {
+       $selectedErrorCase inspect
+   }
+}
+IDE::TestBrowser instproc retryTests {} {
+   [self] instvar errorCases
+   IDE::Dialog error "not implemented yet !!!"
+}
+IDE::TestBrowser instproc runAllTests {} {
+   [self] runTests [[self]::testclasses getList]
+}
+IDE::TestBrowser instproc runSelectedTests {} {
+   [self] runTests [[self]::testclasses selectedItem]
+}
+IDE::TestBrowser instproc runTests toTest {
+   [self] instvar testCases errorCases
+   [self] initTestCases $toTest
+   foreach test $testCases {
+       if {[$test runAllTests]} {
+            lappend errorCases $test
+       }
+   }
+   if {[llength $errorCases]==0} {
+       IDE::Dialog message "No Errors detected"
+       [self]::failedmethod setList {}
+       [self]::errormessage setText {}
+   } else {
+       IDE::Dialog message "[llength $errorCases] Errors detected"
+   }
+   [self] setErrorCasesList
+}
+IDE::TestBrowser instproc selectErrorCase error {
+   [self] instvar errorCases selectedErrorCase
+   set id [[self]::errorcases selectedIndex]
+   set selectedErrorCase [lindex $errorCases $id]
+   [self] setErrorMethodsList
+}
+IDE::TestBrowser instproc selectFailedMethod method {
+   [self] instvar selectedErrorCase selectedFailedMethod
+   set selectedFailedMethod $method
+   [self]::errormessage setText [$selectedErrorCase getFailedMessageForMethods $method]
+}
+IDE::TestBrowser instproc setErrorCasesList {} {
+   [self] instvar errorCases
+   [self]::errorcases setList [ide::lcollect each $errorCases {set each [$each info class]}]
+}
+IDE::TestBrowser instproc setErrorMethodsList {} {
+   [self] instvar selectedErrorCase
+   [self]::failedmethod setList [$selectedErrorCase getFailedMethods]
+}
+IDE::TestBrowser instproc specificInit {} {
+    [self] instvar win testCases
+    
+    set testCases {}
+
+    label $win.l1 -text "Test Cases"
+    label $win.l2 -text "Failed Test"
+    label $win.l3 -text "Failed Tested Methods"
+    label $win.l4 -text "Error Messages"
+
+    IDE::ListView [self]::testclasses $win.testclasses -multiselect 1
+    IDE::NListView [self]::errorcases $win.errorcases -notify [self] -notifyProc selectErrorCase
+    IDE::NListView [self]::failedmethod $win.failedmethod -notify [self] -notifyProc selectFailedMethod
+    IDE::Text [self]::errormessage $win.errormessage -width 30 -height 15
+    button $win.runall -text {Run All} -command [list [self] runAllTests]
+    button $win.runselected -text {Run Selected} -command [list [self] runSelectedTests]
+    #button $win.dropalltests -text {Drop All} -command [list [self] dropAllTests]
+    #button $win.dropselected -text {Drop Selected} -command [list [self] dropSelectedTests]
+    button $win.retrytests -text {Retry Failed Tests} -command [list [self] retryTests]
+    button $win.inspect -text {Inspect Failed} -command [list [self] inspectFailed]
+    button $win.errorbrowser -text {ErrorStack Browser} -command [list [self] errorBrowser]
+
+    grid $win.testclasses -row 1 -column 0 -sticky news -columnspan 3
+    grid $win.errorcases -row 1 -column 3 -sticky news -columnspan 3
+    grid $win.failedmethod -row 4 -column 0 -sticky news -columnspan 3
+    grid $win.errormessage -row 4 -column 3 -sticky news -columnspan 3
+    grid $win.runall -row 2 -column 0 -sticky w
+    grid $win.runselected -row 2 -column 1 -sticky w
+    grid $win.retrytests -row 2 -column 3 -sticky w
+    grid $win.inspect -row 5 -column 0 -sticky w
+    #grid $win.dropalltests -row 2 -column 3 -sticky w
+    #grid $win.dropselected -row 2 -column 4 -sticky w
+    grid $win.errorbrowser -row 5 -column 3 -sticky w -columnspan 2
+    grid $win.l1 -row 0 -column 0 -sticky w
+    grid $win.l2 -row 0 -column 3 -sticky w
+    grid $win.l3 -row 3 -column 0 -sticky w
+    grid $win.l4 -row 3 -column 3 -sticky w
+    
+    grid columnconfigure $win 2 -weight 1
+    grid columnconfigure $win 5 -weight 1
+    grid rowconfigure $win 1 -weight 1
+    grid rowconfigure $win 4 -weight 1
+
+    next
+
+    [self] initTestCasesList
+}
+IDE::TestBrowser proc newBrowser {} {
+    my new [Object autoname .browser]
+}
+IDE::TestBrowser proc refreshBrowser {} {
+   if {[llength [set browsers [IDE::TestBrowser info instances]]]>0} {
+       [lindex $browsers 0] initTestCasesList
+   }
+}
+IDE::TestBrowser proc startBrowserIfNone {} {
+    if {[llength [set browsers [IDE::TestBrowser info instances]]]==0} {
+       my newBrowser
+   }
+}
+@ Class IDE::TestCase {
+description {Derive all your test from this Class
+Base functionality
+
+Testing Interface
+runAllTests
+
+Creating Test
+overwrite methods:
+startTest
+endTest
+to make you test kontext
+
+All your test method must begin with test*
+and they are running in alphabetical order}
+}
+Class IDE::TestCase
+@ ::IDE::TestCase idemeta component IDETestFramework
+IDE::TestCase instproc assert {test {comment {}}} {
+    set rtest [uplevel [list expr $test]]
+    if {!$rtest} {
+      error "assert failed $comment: [self callingproc] \"$test\" \"[uplevel [list subst $test]]\""
+    }
+}
+IDE::TestCase instproc endTest {} {
+  # overwritte this method to clean up state after every test run
+}
+IDE::TestCase instproc getFailedMessageForMethods method {
+   [self] instvar errorsArr
+   return $errorsArr($method)
+}
+IDE::TestCase instproc getFailedMethods {} {
+   [self] instvar errorsArr
+   return [array names errorsArr]
+}
+IDE::TestCase instproc getTestDir {} {
+    # get test dir. /tmp for unix nothing for else
+    global tcl_platform
+    if {$tcl_platform(platform) eq "unix"} {
+        return /tmp
+    } else {
+        return
+    }
+}
+IDE::TestCase instproc getTestMethods {} {
+   # give sorted testmethods
+   lsort [[[self] info class] info instprocs test*]
+}
+IDE::TestCase instproc hardAssert test {
+    # This Asset can stop testing
+    set rtest [uplevel [list expr $test]]
+    if {!$rtest} {
+      [self] stopTesting  
+      error "assert failed: [self callingproc] \"$test\""
+    }
+}
+IDE::TestCase instproc init {} {
+   [self] instvar testMode
+   set testMode force
+}
+IDE::TestCase instproc resetErrors {} {
+   [self] instvar errorsArr
+   catch  {unset errorsArr}
+}
+IDE::TestCase instproc runAllTests {} {
+   [self] instvar errorsArr testMode
+   global errorInfo
+   [self] resetErrors
+   set ret 0
+   if {![[self] startTest]} {
+       IDE::Dialog error "Can not initialize [self class] test. No Test are started"
+       return 0
+   }
+   foreach m [[self] getTestMethods] {
+       #puts "TestCase [my info class] $m"
+       if {[catch {[self] $m}]} {
+            set errorsArr($m) $errorInfo
+            set ret 1
+            if {$testMode ne "force"} break
+       }
+   }
+   [self] endTest
+   return $ret
+}
+IDE::TestCase instproc startTest {} {
+  # overwritte this method to init state for every test run
+  # return 1 for succesfull initialization
+  return 1
+}
+IDE::TestCase instproc stopTesting {} {
+    [self] instvar testMode
+    set testMode stop
+}
+@ IDE::TestCase proc getMethodCallFromClass {} {
+description {Helper method to generate tests}
+}
+IDE::TestCase proc getMethodCallFromClass class {
+  set ret {}
+  foreach method [$class info instprocs] {
+      append ret "   \$obj $method [$class info instargs $method]\n"
+  }
+  return $ret
+}
+@ IDE::TestCase proc getMethodCallFromObject {} {
+description {Helper method to generate tests}
+}
+IDE::TestCase proc getMethodCallFromObject object {
+  set ret {}
+  foreach method [$object info procs] {
+      append ret "   $object $method [$object info args $method]\n"
+  }
+  return $ret
+}
+

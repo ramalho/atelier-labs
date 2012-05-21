@@ -1,0 +1,770 @@
+# automatically generated from XOTclIDE
+# script require component IDEBaseGUI
+@ Component IDEInternationalizationHelper {
+description {This plug in help to define Tcl message catalogs to
+provide internationalization.
+
+See Tcl documatation for msgcat.
+
+It do following tasks.
+1. Scanning of components after mc "original" command
+2. provide gui for edit translations
+3. can save files that can be used by ::msgcat::mcload command
+
+Limitation
+1. use :: namespace as default
+2. use alwas system language see ::msgcat::mclocale}
+}
+package provide IDEInternationalizationHelper 0.81
+package require IDEBaseGUI
+Class POTHelper -superclass {::IDE::Browser ::IDE::GUICommands} -parameter {{atHead 1}}
+@ ::POTHelper idemeta component IDEInternationalizationHelper
+POTHelper instproc convertPoToMsg {{fileName {}}} {
+    if {$fileName eq ""} {
+         set types {{"POT catalog" .po}}
+         set fileName [IDE::Dialog getOpenFile $types]
+    }
+    if {$fileName eq ""} return
+    set types {{"MSG Tk catalog" .msg}}
+    set outFileName [IDE::Dialog getSaveFile {} $types .msg]
+    if {$fileName eq ""} return
+
+    set if [open $fileName w]
+    set of [open $outFileName w]
+    set waitmode msgid
+    set oldmode msgstr
+    set msgidList [list]
+    set msgstrList [list]
+    while {[gets $if line]>= 0} {
+        if {[regexp {^\s*#} $line] || [string trim $line] eq ""} {
+            puts $of $line
+        } else {
+            if {[regexp "^\s+(".*")" $line _ rest]} {
+                lappend ${oldmode}List $rest
+            } else if {[regexp "^$waitmode .*" $line _ rest]} {
+                set oldmode $waitmode
+                lappend ${oldmode}List $rest
+                if {$waitmode eq msgid && [llength $msgidList]>0} {
+                    puts $of "::msgcat::mcset de $msgidList $msgstrList"
+                }
+                if {$waitmode eq "" msgid} {
+                    set waitmode msgstr
+                } else {
+                    set waitmode msgid
+                }
+            } else {
+                error "await $waitmode key word"
+            }
+        }
+    }
+    close $if
+    close $of
+}
+POTHelper instproc convertXLIFFtoMsg {} {
+    package require tdom
+    set file [::IDE::Dialog getOpenFile]
+    if {$file eq ""} return
+    set f [open $file r]
+
+    set lan [IDE::IDialogEntry getValue "target language"]
+
+    set ofile [IDE::Dialog getSaveFile [file join [file dirname $file] $lan.msg]]
+    if {$ofile eq ""} return
+    set of [open $ofile w]
+    fconfigure $of -encoding utf-8
+
+
+    package require tdom
+    fconfigure $f -encoding utf-8
+    set document [dom parse [read $f]]
+    close $f
+    foreach tu [[$document documentElement] selectNodes file/body/trans-unit] {
+        set source [lindex [$tu selectNodes source] 0]
+        set target [lindex [$tu selectNodes target] 0]
+        if {$target eq ""} {
+            continue
+        }
+        set source [my nodeTextDeep $source]
+        set source [string map [list \n \\n] [my maskUTF8 $source]]
+        set target [my nodeTextDeep $target]
+        set target [string map [list \n \\n] [my maskUTF8 $target]]
+        puts $of "::msgcat::mcset $lan \"$source\" \"$target\""
+    }
+    close $of
+
+    $document delete
+}
+POTHelper instproc createSystemMenu {} {
+    my createNonSystemMenu
+}
+POTHelper instproc editSave text {
+    my instvar catalog item
+    if {$item<0 || $item>=[llength $catalog]} return
+    ::msgcat::mcset [::msgcat::mclocale] [lindex $catalog $item] $text
+}
+POTHelper instproc excludeIDE {} {
+    set idecore [concat [IDE::System getCoreComponentsAll] [IDE::System getExtraComponents]]
+    foreach index [[self]::components selectedIndex] item [[self]::components selectedItem] {
+        if {[ide::lcontain $idecore $item]} {
+            [self]::components removeSelection $index $index
+        }
+    }
+}
+POTHelper instproc extraxtAll {} {
+    my instvar catalog
+    join $catalog \n
+}
+POTHelper instproc fillMenuStruct ms {
+    $ms enablementHandler [self]
+    $ms addCommand {Generate Message Catalog} [list [self] saveMsg]
+    $ms addCommand {Generate XLIFF Catalog} [list [self] generateXLIFF 0]
+    $ms addCommand {Generate XLIFF Template} [list [self] generateXLIFF]
+    $ms addCommand {Generate HTML Template} [list [self] generateHTML]
+    $ms addCommand {Convert XLIFF to Message Catalog} [list [self] convertXLIFFtoMsg]
+    $ms addCommand {Reset Catalog} [list [self] resetCatalog]
+}
+POTHelper instproc firstItem {} {
+    my setItem 0
+}
+POTHelper instproc generateHTML {} {
+    my instvar catalog
+    set rez "<html>\n<body>\n<ul>\n"
+
+    foreach c $catalog {
+        append rez " <li>$c</li>\n"
+    }
+
+    append rez "</ul>\n</body>\n</html>\n"
+
+    IDE::ResultBrowser newBrowser $rez
+}
+POTHelper instproc generateXLIFF {{estasTemplate 1}} {
+    my instvar catalog
+
+    package require tdom
+    set file [::IDE::Dialog getSaveFile catalog.xliff]
+    if {$file eq ""} return
+    set f [open $file w]
+
+    package require tdom
+    fconfigure $f -encoding utf-8
+    package require tdom
+
+
+    set template {
+    <xliff version="1.1">
+    <file datatype="html" source-language="eo" date="2006-02-11">
+<body>
+<trans-unit translate="yes" id="0"><source>Testo de Tradukado</source></trans-unit>
+</body>
+</file></xliff>}
+
+    set document [dom parse -keepEmpties $template]
+    set elem [$document documentElement]
+    set body [lindex [$elem selectNodes file/body] 0]
+    global eeMenuTitles
+
+    set id 0
+    foreach originala $catalog {
+        set orig [subst -nocommands -novariables $originala]
+        set tu [$document createElement trans-unit]
+        $tu setAttribute id $id
+        $tu setAttribute translate yes
+        set source [$document createElement source]
+        $tu appendChild $source
+        $body appendChild $tu
+        while {[set pos [string first %s $originala]]>=0} {
+            $source appendChild [$document createTextNode [string range $orig 0 [expr {$pos-1}]]]
+            set it [$document createElement it]
+            $it appendChild [$document createTextNode %s]
+            $source appendChild $it
+            set originala [string range $originala [expr {$pos+2}] end]
+        }
+        $source appendChild [$document createTextNode $originala]
+        incr id
+        if {!$estasTemplate} {
+            if {[set traduko [msgcat::mc $orig]] ne $orig} {
+                set target [$document createElement target]
+                $tu appendChild $target
+                $body appendChild $tu
+                while {[set pos [string first %s $traduko]]>=0} {
+                    $target appendChild [$document createTextNode [string range $traduko 0 [expr {$pos-1}]]]
+                    set it [$document createElement it]
+                    $it appendChild [$document createTextNode %s]
+                    $target appendChild $it
+                    set traduko [string range $traduko [expr {$pos+2}] end]
+                }
+                $target appendChild [$document createTextNode $traduko]
+            }
+        }
+    }
+
+    puts $f {<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE xliff PUBLIC "-//XLIFF//DTD XLIFF//EN" "http://www.oasis-open.org/committees/xliff/documents/xliff.dtd">}
+
+    puts $f [$elem asXML -indent none]
+    close $f
+    $document delete
+}
+POTHelper instproc getMenuStruct {} {
+    IDE::MenuStruct create [self]::ms "I18n Helper" 0
+}
+POTHelper instproc getTitle {} {
+    return "Message Catolog - I18n Helper"
+}
+POTHelper instproc initFromExisting {} {
+    my instvar catalog
+    set indicator [array startsearch ::msgcat::Msgs]
+    while {[array anymore ::msgcat::Msgs $indicator]} {
+        set elem [array nextelement ::msgcat::Msgs $indicator]
+        set lan [msgcat::mclocale]
+        if {[regexp "$lan,::,(.+)" $elem _ text]} {
+            lappend $catalog $text
+        }
+    }
+    array donesearch ::msgcat::Msgs $indicator
+    my setItem 0
+}
+POTHelper instproc lastItem {} {
+    my instvar catalog
+    my setItem [expr {[llength $catalog]-1}]
+}
+POTHelper instproc loadPoMessages {} {
+    set types {{"POT catalog" .po} {"Messages catalog" .messages}}
+    set fileName [IDE::Dialog getOpenFile $types]
+    if {$fileName eq ""} return
+    set lan [IDE::IDialogEntry getValue "Target Language"]
+    my instvar cat_$lan langs
+    if {[info exists langs] && [lsearch $langs $lan]>=0} {
+        unset -nocomplain cat_$lan
+    } else {
+        lappend langs $lan
+    }
+
+
+    set if [open $fileName r]
+    fconfigure $if -encoding utf-8
+
+    set waitmode msgid
+    set oldmode msgstr
+    set msgidList ""
+    set msgstrList ""
+    set count 0
+    while {[set r [gets $if line]]>=0} {
+        puts "$waitmode $line"
+        if {[regexp {^\s*#} $line] || [string trim $line] eq ""} {
+            # puts $of $line
+        } else {
+            if {[regexp {^\s*"(.*)"} $line _ rest]} {
+                set rest [string trim $rest \"]
+                if {[string range $rest 0 1] eq "_:"} {
+                    continue
+                }
+                append ${oldmode}List $rest
+            } elseif {[regexp "^$waitmode (.*)" $line _ rest]} {
+                set oldmode $waitmode
+                if {$waitmode eq "msgid" && [string length $msgidList]>0} {
+                    set cat_${lan}($msgidList) $msgstrList
+                    set msgidList [string trim $rest \"]
+                    set msgstrList ""
+                    incr count
+                } else {
+                    set msgstrList [string trim $rest \"]
+                }
+                if {$waitmode eq "msgid"} {
+                    set waitmode msgstr
+                } else {
+                    set waitmode msgid
+                }
+            }
+        }
+    }
+    if {$waitmode eq "msgid" && [string length $msgidList]>0} {
+        set cat_${lan}($msgidList) $msgstrList
+        set msgidList ""
+        set msgstrList ""
+        incr count
+    }
+    puts "last gets $r $line"
+    close $if
+    return $count
+}
+POTHelper instproc makeEoDeCatalog {} {
+    package require tdom
+    my instvar cat_eo cat_de
+    set doc [dom createDocument tmx]
+    set tmx [$doc documentElement]
+    set body [$doc createElement body]
+    $tmx appendChild $body
+
+    for {set sid [array startsearch cat_eo]} {[array anymore cat_eo $sid]} {} {
+        set name [array nextelement cat_eo $sid]
+        if {[info exists cat_de($name)]} {
+             set tu [$doc createElement tu]
+             $body appendChild $tu
+             set tuv [$doc createElement tuv]
+             $tuv setAttribute xml:lang eo
+             $tu appendChild $tuv
+             set seg [$doc createElement seg]
+             $tuv appendChild $seg
+             $seg appendChild [$doc createTextNode $cat_eo($name)]
+
+             set tuv [$doc createElement tuv]
+             $tuv setAttribute xml:lang de
+             $tu appendChild $tuv
+             set seg [$doc createElement seg]
+             $tuv appendChild $seg
+             $seg appendChild [$doc createTextNode $cat_de($name)]
+
+             set tuv [$doc createElement tuv]
+             $tuv setAttribute xml:lang en
+             $tu appendChild $tuv
+             set seg [$doc createElement seg]
+             $tuv appendChild $seg
+             $seg appendChild [$doc createTextNode $name]
+        }
+    }
+    array donesearch cat_eo $sid
+
+    set of [open eode.tmx w]
+    fconfigure $of -encoding utf-8
+    puts $of [[$doc documentElement] asXML]
+    close $of
+}
+POTHelper instproc makeEoPlCatalog {} {
+    package require tdom
+    my instvar cat_eo cat_pl
+    set doc [dom createDocument tmx]
+    set tmx [$doc documentElement]
+
+    for {set sid [array startsearch cat_eo]} {[array anymore cat_eo $sid]} {} {
+        set name [array nextelement cat_eo $sid]
+        if {[info exists cat_pl($name)]} {
+             set tu [$doc createElement tu]
+             $tmx appendChild $tu
+             set tuv [$doc createElement tuv]
+             $tuv setAttribute xml:lang eo
+             $tu appendChild $tuv
+             set seg [$doc createElement seg]
+             $tuv appendChild $seg
+             $seg appendChild [$doc createTextNode $cat_eo($name)]
+
+             set tuv [$doc createElement tuv]
+             $tuv setAttribute xml:lang pl
+             $tu appendChild $tuv
+             set seg [$doc createElement seg]
+             $tuv appendChild $seg
+             $seg appendChild [$doc createTextNode $cat_pl($name)]
+
+             set tuv [$doc createElement tuv]
+             $tuv setAttribute xml:lang en
+             $tu appendChild $tuv
+             set seg [$doc createElement seg]
+             $tuv appendChild $seg
+             $seg appendChild [$doc createTextNode $name]
+        }
+    }
+    array donesearch cat_eo $sid
+
+    set of [open eopl.tmx w]
+    fconfigure $of -encoding utf-8
+    puts $of [[$doc documentElement] asXML]
+    close $of
+}
+POTHelper instproc maskString text {
+    set out ""
+    for {set x 0} {$x<[string length $text]} {incr x} {
+        set c [string index $text $x]
+        set i [scan $c %c]
+        if {$i>127} {
+            append out "\\u[format %04x $i]"
+        } else {
+            append out $c
+        }
+    }
+    string map {\" \\\"} $out
+}
+POTHelper instproc maskUTF8 text {
+    set out ""
+    for {set x 0} {$x<[string length $text]} {incr x} {
+        set c [string index $text $x]
+        set i [scan $c %c]
+        if {$i>127} {
+            append out "\\u[format %04x $i]"
+        } else {
+            append out $c
+        }
+    }
+    return $out
+}
+POTHelper instproc nextEmptyItem {} {
+    my instvar catalog item
+    set x $item
+    while {$x<[llength $catalog]} {
+        incr x
+        set original [lindex $catalog $x]
+        if {[msgcat::mc $original] eq $original} {
+            my setItem $x
+            return
+        }
+    }
+}
+POTHelper instproc nextItem {} {
+    my setItem [expr {[my set item]+1}]
+}
+POTHelper instproc nextMisspelledEspItem {} {
+    my instvar catalog item
+    set lng [lindex [split [::msgcat::mclocale] _ ] 0]
+    set x $item
+    while {$x<[llength $catalog]} {
+        incr x
+        set original [lindex $catalog $x]
+        set trans $original
+        set vlist [regexp -all -inline {\m[[:alpha:]]{3,}\M} $trans]
+        if {[llength $vlist]==0} continue
+        set unknown [AspellTestilo testuVortoj eo $vlist]
+        if {[llength $unknown]>0} {
+            my setItem $x
+            foreach v $unknown {
+                [self]::original colorizeText $v
+            }
+            return
+        }
+    }
+}
+POTHelper instproc nextMisspelledItem {} {
+    my instvar catalog item
+    set lng [lindex [split [::msgcat::mclocale] _ ] 0]
+    set x $item
+    while {$x<[llength $catalog]} {
+        incr x
+        set original [lindex $catalog $x]
+        if {[set trans [msgcat::mc $original]] ne $original} {
+            set vlist [regexp -all -inline {\m[[:alpha:]]{3,}\M} $trans]
+            if {[llength $vlist]==0} continue
+            set unknown [AspellTestilo testuVortoj $lng $vlist]
+            if {[llength $unknown]>0} {
+                my setItem $x
+                foreach v $unknown {
+                    [self]::translation colorizeText $v
+                }
+                return
+            }
+        }
+    }
+}
+POTHelper instproc nextSpecItem {} {
+    my instvar catalog item
+    set lng [lindex [split [::msgcat::mclocale] _ ] 0]
+    set x $item
+    while {$x<[llength $catalog]} {
+        incr x
+        set original [lindex $catalog $x]
+        if {[set trans [msgcat::mc $original]] ne $original} {
+            set volist [regexp -all -inline {%s} $original]
+            set vtlist [regexp -all -inline {%s} $trans]
+            if {[llength $volist]!=[llength $vtlist]} {
+                my setItem $x
+                return
+            }
+        }
+    }
+}
+POTHelper instproc nodeTextDeep node {
+    set rez ""
+    foreach n [$node childNodes] {
+        if {[$n nodeType] eq "TEXT_NODE"} {
+            append rez [$n nodeValue]
+        } else {
+            append rez [my nodeTextDeep $n]
+        }
+    }
+    return $rez
+}
+POTHelper instproc prevEmptyItem {} {
+    my instvar catalog item
+    set x $item
+    while {$x>0} {
+        incr x -1
+        set original [lindex $catalog $x]
+        if {[msgcat::mc $original] eq $original} {
+            my setItem $x
+            return
+        }
+    }
+}
+POTHelper instproc prevItem {} {
+    my setItem [expr {[my set item]-1}]
+}
+POTHelper instproc readComponents {} {
+   [self]::components setList [IDE::IntroProxy getComponents]
+}
+POTHelper instproc readTranslation {if line o_ref t_ref} {
+    upvar o_ref original
+    upvar t_re translation
+    
+}
+POTHelper instproc resetCatalog {} {
+    my instvar catalog
+    set catalog [list]
+    my setItem 0
+}
+POTHelper instproc saveCatalogAsPot {{fileName {}}} {
+    if {$fileName eq ""} {
+         set types {{"POT catalog" .pot}}
+         set fileName [IDE::Dialog getSaveFile {} $types .pot]
+    }
+    if {$fileName eq ""} return
+    my instvar catalog
+    set f [open $fileName w]
+    puts $f "# POT File generated by XOTclIDE Internationalization Helper PlugIn"
+    foreach str $catalog {
+        puts $f "msgid \"$str\""
+        puts $f {msgstr ""}
+    }
+    close $f
+}
+POTHelper instproc saveMsg {{fileName {}}} {
+    if {$fileName eq ""} {
+         set types {{"MSG catalog" .msg}}
+         set fileName [IDE::Dialog getSaveFile {} $types .msg]
+    }
+    if {$fileName eq ""} return
+    my instvar catalog
+    set f [open $fileName w]
+    puts $f "# Message Catalog File generated by XOTclIDE Internationalization Helper PlugIn"
+    foreach str $catalog {
+        set translation [msgcat::mc $str]
+        if {$str ne $translation} {
+            puts $f "::msgcat::mcset de \"$str\" \"[my maskString $translation]\""
+        } else {
+            puts $f "#::msgcat::mcset de \"$str\" \"###\""
+        }
+    }
+    close $f
+}
+POTHelper instproc scanAllXdobry {} {
+    foreach com [IDE::Component getComponentNames] {
+        if {![string match xdobry::* $com]} continue
+        my scanComponent $com
+    }
+}
+POTHelper instproc scanBody body {
+    set pattern {\[mc "(.+?)"}
+    my instvar catalog
+    foreach {dummy str} [regexp -all -inline $pattern $body] {
+        if {[lsearch -exact $catalog $str]<0} {
+            lappend catalog [subst -nocommands -novariables $str]
+        }
+    }
+    #set pattern {\[::msgcat::mc "(.+?)}
+    #foreach {dummy str} [regexp -all -inline $pattern $body] {
+    #    if {[lsearch -exact $catalog $str]<0} {
+    #        lappend catalog $str
+    #    }
+    #}
+}
+POTHelper instproc scanComponent component {
+     set cobj [IDE::Component getCompObjectForNameIfExist $component]
+     if {$cobj eq ""} {
+         error "$component not found"
+     }
+     foreach pobj [$cobj getProcsGroupsObjects] {
+         foreach proc [$pobj getProcsNames] {
+             my scanBody [info body $proc]
+         }
+     }
+     foreach obj [$cobj getObjects] {
+         foreach proc [$obj info procs] {
+              my scanBody [$obj info body $proc]
+         }
+     }
+     foreach obj [$cobj getClasses] {
+         foreach proc [$obj info procs] {
+              my scanBody [$obj info body $proc]
+         }
+         foreach iproc [$obj info instprocs] {
+              my scanBody [$obj info instbody $iproc]]
+         }
+     }
+}
+POTHelper instproc scanComponents {} {
+    foreach c [[self]::components getList] {
+        my scanComponent $c
+    }
+    my setItem 0
+}
+POTHelper instproc selectAll {} {
+   [self]::components addSelection 0 end
+}
+POTHelper instproc setItem id {
+    my instvar catalog win item
+    if {$id<0 || $id>=[llength $catalog]} return
+    set item $id
+    $win.itemcount configure -text "[expr {$id+1}] from [llength $catalog]"
+    set original [lindex $catalog $id]
+    [self]::original setText $original
+    set translation [msgcat::mc $original]
+    if {$translation eq $original} {
+        [self]::translation setTextControler "" [self]
+    } else {
+        [self]::translation setTextControler $translation [self]
+    }
+}
+POTHelper instproc specificInit {} {
+    my instvar win
+
+    my set item 0
+    my set catalog [list]
+
+    message $win.message -text "This tool help to generate message catalog for Tcl internatinalization. It scan sources (after \[mc \"original text\"]), help to produce translation and can genarate .msg files" -width 450
+
+    frame $win.scan
+    frame $win.buttons
+    frame $win.trans
+
+    IDE::ListView create [self]::components $win.scan.components -multiselect 1 -width 40
+    button $win.scan.scan -text "Scan Components" -command [list [self] scanComponents]
+    button $win.scan.reread -text "Init from existing msgcat" -command [list [self] initFromExisting]
+    button $win.scan.all -text "Select All Components" -command [list [self] selectAll]
+    button $win.scan.allTcl -text "Exclude IDE Components" -command [list [self] excludeIDE]
+
+    pack $win.scan.components -side left
+    pack $win.scan.scan $win.scan.reread $win.scan.all $win.scan.allTcl -anchor w
+
+    label $win.itemcount
+
+    button $win.buttons.next -text "Next" -command [list [self] nextItem]
+    button $win.buttons.prev -text "Prev" -command [list [self] prevItem]
+    button $win.buttons.nextEmpty -text "Next Empty" -command [list [self] nextEmptyItem]
+    button $win.buttons.prevEmpty -text "Prev Empty" -command [list [self] prevEmptyItem]
+    button $win.buttons.first -text "Firtst" -command [list [self] firstItem]
+    button $win.buttons.last -text "Last" -command [list [self] lastItem]
+    button $win.buttons.spell -text "Next misspelled" -command [list [self] nextMisspelledItem]
+
+    pack $win.buttons.next $win.buttons.prev $win.buttons.nextEmpty $win.buttons.prevEmpty $win.buttons.first $win.buttons.last $win.buttons.spell -side left
+
+    IDE::Text create [self]::original $win.trans.original -width 40 -height 20
+    IDE::MethodEdit create [self]::translation $win.trans.translation -width 40 -height 20
+
+    pack $win.trans.original $win.trans.translation -side left -expand yes -fill both
+
+    button $win.generate -text "Generate Message Catalog" -command [list [self] saveMsg]
+
+    pack $win.message -anchor w
+    pack $win.scan -anchor w
+    pack $win.buttons -anchor w
+    pack $win.itemcount -anchor w
+    pack $win.trans -fill both -expand yes
+    pack $win.generate -anchor w
+
+    bind $win <Next> [list [self] nextItem]
+    bind $win <Prior> [list [self] prevItem]
+    my readComponents
+}
+POTHelper instproc testDe {} {
+    my instvar cat_de
+    llength [array names cat_de]
+}
+POTHelper instproc testEo {} {
+    my instvar cat_eo
+    llength [array names cat_eo]
+}
+POTHelper proc convertPoToWin {} {
+    set filetemp [IDE::Dialog getOpenFile]
+    set filepo [IDE::Dialog getOpenFile]
+    set fileout [IDE::Dialog getSaveFile TimePunch.Polish.properties]
+
+    set fi [open $filepo r]
+    while {[gets $fi line]>=0} {
+        set line [string trim $line]
+        if {$line eq ""} continue
+        if {[lindex $line 0] eq "msgid"} {
+            set msgid [string trim [lindex $line 1] \"]
+        }
+        if {[lindex $line 0] eq "msgstr"} {
+            set from($msgid) [string trim [lindex $line 1] \"]
+        }
+    }
+    close $fi
+
+    set fi [open $filetemp r]
+    set fo [open $fileout w]
+    while {[gets $fi line]>=0} {
+        set line [string trim $line]
+        if {$line eq ""} {
+            puts $fo $line
+            continue
+        }
+        set i [string first = $line]
+        if {$i<0} {
+            puts $fo $line
+            continue
+        }
+        set eng [string range $line [expr {$i+1}] end]
+        if {[info exists from($eng)]} {
+            puts $fo [string range $line 0 $i]$from($eng)
+        } else {
+            puts $fo $line
+        }
+    }
+    close $fi
+    close $fo
+}
+POTHelper proc convertWinCvsToPo {} {
+    set fileindir [IDE::Dialog getDir]
+    set fileout [IDE::Dialog getSaveFile $fileindir/ms.po]
+    if {$fileindir eq "" || $fileout eq ""} return
+    set fo [open $fileout w]
+    foreach filein [glob -directory $fileindir *.csv] {
+        # if {[file tail $filein] ne "po_sch95.csv"} continue
+        puts "reading $filein"
+        set fi [open $filein r]
+        fconfigure $fi -encoding unicode
+        gets $fi
+        while {[gets $fi line]>=0} {
+            set line [string trim $line]
+            if {$line eq ""} continue
+            if {[string first Microsoft $line]>=0} continue
+            if {[string first Windows $line]>=0} continue
+            set arr [split $line ,]
+            if {[llength $arr]<2} continue
+            set from [string trim [lindex $arr 0] \"]
+            set to [string trim [lindex $arr 2] \"]
+            if {[string first \" $from]>=0} continue
+            set from [string map {{""} {\"}} $from]
+            set to [string map {{""} {\"}} $to]
+            #puts "$line - $from - $to"
+            if {![info complete $from]} continue
+            if {[string length $from]>25} continue
+            if {[info exists fromarr($from)]} continue
+            set fromarr($from) 1
+            puts $fo "msgid \"$from\""
+            puts $fo "msgstr \"$to\""
+            puts $fo ""
+        }
+        close $fi
+    }
+    close $fo
+}
+POTHelper proc convertWinToPo {} {
+    set filein [IDE::Dialog getOpenFile]
+    set fileout [IDE::Dialog getSaveFile $filein.po]
+    if {$filein eq "" || $fileout eq ""} return
+    set fi [open $filein r]
+    set fo [open $fileout w]
+    while {[gets $fi line]>=0} {
+        set line [string trim $line]
+        if {$line eq ""} continue
+        set i [string first = $line]
+        if {$i<0} continue
+        puts $fo "msgid \"[string range $line [expr {$i+1}] end]\""
+        puts $fo msgstr
+    }
+    close $fi
+    close $fo
+}
+POTHelper proc newBrowser {} {
+  return [my new [Object autoname .i18nhelper]]
+}
+

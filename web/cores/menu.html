@@ -1,0 +1,20 @@
+<html>
+<!--menu.html-->
+<body id="menu">
+
+<script>
+var menu=document.getElementById('menu')
+
+
+for (var i=0; i<6; i++) {
+	var ancora=document.createElement('a')
+	ancora.innerHTML='Teste Cores '+i
+	ancora.href="javascript:top.global.mudaVisor('cores"+i+".html')"
+	menu.appendChild(ancora)
+	menu.appendChild(document.createElement('br'))
+}
+</script>
+
+
+</body>
+</html>

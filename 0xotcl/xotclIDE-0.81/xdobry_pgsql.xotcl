@@ -1,0 +1,275 @@
+# automatically generated from XOTclIDE
+# script require component xdobry::sql
+@ Component xdobry::pgsql {
+description {API To postgresql database using the
+PgTcl interface
+PgTcl Tcl interface should be in your Linux distribution with postgres client software.
+
+}
+}
+package provide xdobry::pgsql 0.74
+package require xdobry::sql
+Class PgSql -superclass ::Sqlinterface  -parameter {user password hostname {interface postgres}}
+@ ::PgSql idemeta categories {private api schema-api}
+@ ::PgSql idemeta categoriesMethods {{getdblist setdb} {disconnect returnAffectedRows execute getconnectargs insertRowAutoId query queryList connect} {getTables getColumns extract_table}}
+@ ::PgSql idemeta component xdobry::pgsql
+PgSql instproc connect par_list {
+    my instvar sqlhandle connected dbank user password hostname
+    set conninfo {}
+    array set par_array $par_list
+    foreach par [array names par_array] {
+        if {$par_array($par) ne ""} {
+            if {$par eq "interface"} {
+                continue
+            }
+            if {$par eq "dbname"} {
+                set dbank $par_array($par)
+            }
+            my  instvar $par
+            set $par $par_array($par)
+            lappend conninfo "$par='$par_array($par)'"
+        }
+    }
+    if {[catch {set sqlhandle [pg_connect -conninfo $conninfo]} err]!=0} {
+        my errorMessage $err
+        return 0
+    }
+    set connected 1
+    return 1
+}
+PgSql instproc convertBytea value {
+    # we assume that postgres octed notation is equal to Tcl
+    subst -nocommands -novariables $value
+}
+PgSql instproc disconnect {} {
+    my instvar sqlhandle connected
+    if {$connected} {
+        pg_disconnect $sqlhandle
+    }
+    set connected 0
+}
+@ PgSql instproc execute {} {
+description {Sendet eine SQL Anweisung an Server (keine SELECT)}
+}
+PgSql instproc execute sqlstatement {
+    my instvar sqlhandle insertid
+    if {[catch {pg_execute $sqlhandle $sqlstatement} ret]} {
+        my errorMessage $ret
+        return
+    }
+    if {$ret eq ""} {set ret 0}
+    return $ret
+}
+PgSql instproc extract_table {visitor table} {
+    #puts "extact Table";
+    set qhandle [my query "select attname,typname,attnotnull,atttypmod,attlen from pg_class,pg_attribute,pg_type where pg_class.relname='$table' and pg_class.oid=pg_attribute.attrelid and pg_attribute.atttypid=pg_type.oid and attnum>0 order by attnum"]
+    array set typeArr [my getTypeConvert]
+    while {[set attr [$qhandle fetch]] ne ""} {
+	#puts "extact Table --";
+	set alist {}
+	keylset alist name [lindex $attr 0]
+	set type [lindex $attr 1]
+	if {[info exists typeArr($type)]} {
+	    set type $typeArr($type)
+	}
+	keylset alist type $type
+	if {[lindex $attr 2] eq "f"} {
+	    keylset alist null 1
+	}
+	if {[lindex $attr 4] eq "-1" && [lindex $attr 3] ne "-1" } {
+	    keylset  alist tlenght [expr [lindex $attr 3]-4]
+	}
+	$visitor newattribute $alist
+    }
+    $qhandle destroy
+}
+PgSql instproc getColumns table {
+    my queryList "select attname from pg_class,pg_attribute where pg_class.relname='$table' and pg_class.oid=pg_attribute.attrelid and attnum>0 order by pg_attribute.attnum"
+}
+PgSql instproc getMaskedValue {value type} {
+    if {$type eq "datetime" || $type eq "timestamp"} {
+        return [my getTimeValue $value]
+    } elseif {$type eq "boolean"} {
+        if {$value} {
+            return true
+        } else {
+            return false
+        }
+    } elseif {$type eq "longblob"} {
+        return [my maskBytea $value]
+    } elseif {[my needEscape $type]} {
+        return '[my escape $value]'
+    } else {
+        return $value
+    }
+}
+PgSql instproc getTables {} {
+    my queryList {select relname from pg_class where (relname !~ '^pg_') and (relkind='r') and  (relname !~ '^pga_')}
+}
+PgSql instproc getTimeValue time {
+    if {[string first 0000-00-00 $time]>0} {
+        return NULL
+    }
+    # Access do not accept Time Format 00:00:00.000
+    # also cut last digits
+    set ret [regsub {(.*\d\d:\d\d:\d\d).\d+} $time {\1}]
+    return '$ret'
+}
+PgSql instproc getTypeConvert {} {
+    list int2 smallint int4 int integer int float4 float float8 double bool boolean date datatime time datetime bytea longblob numeric decimal
+}
+PgSql instproc getconnectargs {} {
+    global env
+    my instvar dbank
+    foreach arg [pg_conndefaults] {
+        if {[lindex $arg 0] eq "password"} {
+            lappend connlist [list [lindex $arg 0] password [lindex $arg 4]]
+        } else {
+            lappend connlist [list [lindex $arg 0] text [lindex $arg 4]]
+            if {[lindex $arg 0] eq "dbname"} {
+                set dbank [lindex $arg 4]
+            }
+        }
+    }
+    return $connlist
+}
+PgSql instproc getdblist {} {
+    error "postgresql interface don't support this funktionality. You must know names of your databases"
+}
+PgSql instproc insertRow {table columns values {types {}}} {
+    # postgres do not support [] syntax for enabling spaces in table name
+    # postgres do not accept 0,1 as boolean values
+    # we need to convert to false, true
+    if {[lsearch $types boolean]>=0} {
+        set cvalues [list]
+        foreach v $values t $types {
+            if {$t eq "boolean"} {
+                if {$v} {
+                    lappend cvalues true
+                } else {
+                    lappend cvalues false
+                }
+            } else {
+                lappend cvalues $v
+            }
+        }
+    } else {
+        set cvalues $values
+    }
+    next $table $columns $cvalues $types
+}
+PgSql instproc insertRowAutoId {table columns values {primarykey {}} {sequenzer {}}} {
+    if {$sequenzer eq ""} {
+        set sequenzer ${table}_seq
+    }
+    if {$primarykey eq ""} {
+        set primarykey id
+    }
+    set idvalue [lindex [my queryList "SELECT NEXTVAL ('$sequenzer')"] 0]
+    lappend columns $primarykey
+    lappend values $idvalue
+    my insertRow $table $columns $values
+    return $idvalue
+}
+PgSql instproc maskBytea value {
+    binary scan $value c* bytes
+    set ret '
+    foreach byte $bytes {
+        append ret {\\}
+        append ret [format %03o [expr {($byte + 0x100 ) % 0x100}]]
+    }
+    append ret '
+    return $ret
+}
+PgSql instproc maskTableName tableName {
+    string map {" " _} $tableName
+}
+PgSql instproc query sqlstatment {
+    my instvar sqlhandle
+    set qhandle [pg_exec $sqlhandle $sqlstatment]
+    #puts "Querry Status [pg_result $qhandle -status]"
+    if {[pg_result $qhandle -status] eq "PGRES_FATAL_ERROR"} {
+        my errorMessage [pg_result $qhandle -error]
+        pg_result $qhandle -clear
+        return {}
+    }
+    PgSql::SqlQuerry new -qhandle $qhandle
+}
+PgSql instproc queryList sqlstatement {
+    my instvar sqlhandle error_msg
+    set qhandle [pg_exec $sqlhandle $sqlstatement]
+    if {[pg_result $qhandle -status] eq "PGRES_FATAL_ERROR"} {
+        my errorMessage [pg_result $qhandle -error]
+        pg_result $qhandle -clear
+        return {}
+    }
+    set rows {}
+    set numTuples [pg_result $qhandle -numTuples]
+    for {set x 0} {$x<$numTuples} {incr x} {
+        lappend rows [pg_result $qhandle -getTuple $x]
+    }
+    #pg_result $qhandle -list rows
+    pg_result $qhandle -clear
+    return $rows
+}
+PgSql instproc returnAffectedRows {} {
+    return 1
+}
+PgSql instproc setdb dbname {
+    error "postgresql interface don't support this funktionality. You must know names of your databases"
+}
+PgSql proc initializeInterface {{prefs package}} {
+   global errorInfo
+   if {$prefs eq "package"} {
+       if {![catch {package require Pgtcl}]} return
+       puts stderr "can not load package PgSql $errorInfo"
+       set prefs /usr/lib/libpgtcl.so
+   }
+   if {[catch {load $prefs}]} {
+       puts stderr "can not load library $prefs $errorInfo"
+   }
+}
+@ Class PgSql::SqlQuerry {
+description {PgSql instproc getinsertid {} {
+[self] instvar insertid
+return $insertid
+}}
+}
+Class PgSql::SqlQuerry -parameter qhandle
+@ ::PgSql::SqlQuerry idemeta component xdobry::pgsql
+PgSql::SqlQuerry instproc columnNames {} {
+    pg_result [my set qhandle] -attributes
+}
+PgSql::SqlQuerry instproc destroy {} {
+    pg_result [my qhandle] -clear
+    next
+}
+PgSql::SqlQuerry instproc fetch {} {
+    my instvar qhandle tindex numTuples
+    if {$tindex<$numTuples} {
+        set result [pg_result $qhandle -getTuple $tindex]
+        incr tindex
+    } else {
+        set result {}
+    }
+    #puts "fetch $tindex $result"
+    return $result
+}
+PgSql::SqlQuerry instproc init args {
+    next
+    my set numTuples [pg_result [my qhandle] -numTuples]
+    my set tindex 0
+}
+@ PgSql::SqlQuerry instproc rows {} {
+description {PgSql::SqlQuerry instproc getinsertid {} {
+[self] instvar qhandle
+return [pg_result $qhandle -oid]
+}}
+}
+PgSql::SqlQuerry instproc rows {} {
+    my set numTuples
+}
+PgSql::SqlQuerry instproc seek point {
+    my set tindex $point
+}
+

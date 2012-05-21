@@ -1,0 +1,423 @@
+# automatically generated from XOTclIDE
+# script require component {IDECore IDEView}
+@ Component IDEKitDeployer {
+description {This Deployer can generate Tcl Kit packages
+see http://www.equi4.com/tclkit
+
+The parts of this components was taken from sdx tclkit 
+
+# set f [open H:/Trzewi/xotclIDE50.exe/main.tcl r]; set r [read $f]; close $f; set r}
+}
+package provide IDEKitDeployer 0.74
+package require IDECore
+package require IDEView
+Class IDE::TclKitDeployer -superclass ::IDE::Deployer
+@ ::IDE::TclKitDeployer idemeta component IDEKitDeployer
+@ IDE::TclKitDeployer instproc LoadHeader {} {
+description {procedure taken from sdx}
+}
+IDE::TclKitDeployer instproc LoadHeader filename {
+     my instvar origicon
+     if {[file normalize $filename] == [info nameofexe]} {
+        error "file in use, cannot be prefix: [file normalize $filename]"
+     }
+     set size [file size $filename]
+     catch {
+         vfs::mk4::Mount $filename hdr -readonly
+         # we only look for an icon if the runtime is called *.exe (!)
+         if {[string tolower [file extension $filename]] == ".exe"} {
+            catch { set origicon [my readfile hdr/tclkit.ico] }
+         }
+      }
+      catch { vfs::unmount $filename }
+      return [my readfile $filename]
+}
+IDE::TclKitDeployer instproc changeDir {} {
+    my instvar targetDir win
+    set targetDir [IDE::Dialog getSaveFile $targetDir]
+}
+IDE::TclKitDeployer instproc changeStarpack {} {
+    my instvar starPackFile
+    set starPackFile [IDE::Dialog getOpenFile {{{Exe Files} *.exe} {{All files} *}}]
+}
+IDE::TclKitDeployer instproc decICO dat {
+  set result {}
+  binary scan $dat sss - type count
+  for {set pos 6} {[incr count -1] >= 0} {incr pos 16} {
+    binary scan $dat @${pos}ccccssii w h cc - p bc bir io
+    if {$cc == 0} { set cc 256 }
+    #puts "pos $pos w $w h $h cc $cc p $p bc $bc bir $bir io $io"
+    binary scan $dat @${io}a$bir image
+    lappend result ${w}x${h}/$cc $image
+  }
+  return $result
+}
+IDE::TclKitDeployer instproc getStartscriptName {} {
+    return main.tcl
+}
+IDE::TclKitDeployer instproc getTitle {} {
+  return "TclKit Deployer"
+}
+@ IDE::TclKitDeployer instproc makeHeaderFile {} {
+description {procedure partially taken from sdx}
+}
+IDE::TclKitDeployer instproc makeHeaderFile {} {
+    my instvar targetDir starPackFile
+    if {$starPackFile ne ""} {
+        if {[file extension $targetDir] ne ".exe"} {
+            append targetDir .exe
+        }
+        set header [my LoadHeader $starPackFile]
+    } else {
+        set header {#!/bin/sh
+# %
+exec @PROG@ "$0" ${1+"$@"}
+package require starkit
+starkit::header @TYPE@ @OPTS@
+}
+        append header \32
+        regsub % $header \\ header
+
+        set prog wish
+        set ropts -readonly
+        set type mk4
+    
+        regsub @PROG@ $header $prog header
+        regsub @OPTS@ $header $ropts header
+        regsub @TYPE@ $header $type header
+
+        set n [string length $header]
+        while {$n <= 240} {
+            append header ################
+            incr n 16
+        }
+
+        set slop [expr { 15 - (($n + 15) % 16) }]
+        for {set i 0} {$i < $slop} {incr i} {
+        append header #
+        }
+        set n [string length $header]
+        if {$n % 16 != 0} {
+            error "Header size is $n, should be a multiple of 16"
+        }
+    }
+    my writefile $targetDir $header
+}
+IDE::TclKitDeployer instproc postGenerate {} {
+    my instvar targetDir old_dir isXOTclcode cleanXOTcl starPackFile
+    if {$isXOTclcode && [info exists ::starkit::topdir]} {
+        global ::starkit::topdir
+        file mkdir ${targetDir}/lib
+        file copy -force -- ${::starkit::topdir}/lib/xotcl1.3.4 ${targetDir}/lib
+        if {$cleanXOTcl} {
+            file delete -force -- ${targetDir}/lib/xotcl1.3.4/lib ${targetDir}/lib/xotcl1.3.4/xml ${targetDir}/lib/xotcl1.3.4/registry
+        }
+    }
+    vfs::unmount $targetDir
+    cd $old_dir
+    # if starpack and non windows set file execution attribute
+    if {$starPackFile ne "" && ![IDE::System isWindowsPlatform]} {
+        file attributes $targetDir -permission rwxr--r--
+    }
+}
+IDE::TclKitDeployer instproc prepareDirectory {} {
+    my instvar targetDir old_dir
+    
+    my makeHeaderFile
+    set old_dir [pwd]
+    vfs::mk4::Mount $targetDir $targetDir
+    catch {cd $targetDir}
+    cd $targetDir
+}
+IDE::TclKitDeployer instproc readfile name {
+  set fd [open $name]
+  fconfigure $fd -translation binary
+  set data [read $fd]
+  close $fd
+  return $data
+}
+IDE::TclKitDeployer instproc setFileAttributes {} {
+   # nothing
+}
+IDE::TclKitDeployer instproc specificInit {} {
+  my instvar win isXOTclcode startPackFile targetDir configName startPackFile cleanXOTcl
+  next
+  set starPackFile ""
+  set cleanXOTcl 1
+  set targetDir [file join $targetDir [file rootname $configName].kit]
+  $win.sframe.target configure -state disabled
+
+  checkbutton $win.cleanXOTcl -text "ignore XOTcl additional libs" -variable [self]::cleanXOTcl
+  if {![info exists ::starkit::topdir]} {
+      set isXOTclcode 0
+      set cleanXOTcl 0
+      $win.isxotclcode configure -state disabled
+      $win.cleanXOTcl configure -state disabled
+  }
+  frame $win.pframe
+  label $win.pframe.lab -text "Starpack exe"
+  label $win.pframe.target -border 2 -width 40 -relief sunken -anchor w -textvariable [self]::starPackFile
+  button $win.pframe.change -text "Change" -command [list [self] changeStarpack]
+  pack $win.pframe.lab  -side left
+  pack $win.pframe.target -fill x -expand yes -side left
+  pack $win.pframe.change -side left
+
+  pack $win.cleanXOTcl -anchor w -before $win.buttons 
+  pack $win.pframe -anchor w  -before $win.buttons
+  my getComponentsToDeploy
+}
+IDE::TclKitDeployer instproc startScriptInvocation {} {
+    my instvar isXOTclcode nopackages onefile
+    set ret {package require starkit
+starkit::startup
+set progdir $::starkit::topdir
+}
+
+    if {$isXOTclcode} {
+        append ret {if {$tcl_platform(platform) eq "windows"} {
+    set ad [pwd]
+    cd $tcl_library
+    package require XOTcl
+    package require Tk
+    cd $ad
+}
+if {![info exists xotcl::version]} {
+    package require XOTcl
+}
+
+if {![xotcl::Object isobject Object]} {
+   namespace import xotcl::*
+}
+}
+   }
+   if {!$nopackages && !$onefile} {
+      append ret {lappend auto_path $::starkit::topdir} \n
+   } 
+   return $ret
+}
+IDE::TclKitDeployer instproc wrap {} { 
+   set out [lindex $argv 0]
+   set idir [file root [file tail $out]].vfs
+   set compress 1
+   set verbose 0
+   set ropts -readonly
+   set prefix 0
+   set reusefile 0
+   set prog tclkit
+   set type mk4
+   set macbin 0
+   set explist {}
+   set syncopts {}
+
+set a [lindex $argv 1]
+while {[string match -* $a]} {
+  switch -- $a {
+    -interp {
+      set prog [lindex $argv 2]
+      set argv [lreplace $argv 1 2]
+    }
+    -runtime {
+      set pfile [lindex $argv 2]
+      if {$pfile == $out} {
+	set reusefile 1
+      } else {
+	set header [my LoadHeader [lindex $argv 2]]
+      }
+      set argv [lreplace $argv 1 2]
+      set prefix 1
+    }
+    -macbinary {
+      set macbin 1
+      set argv [lreplace $argv 1 1]
+    }
+    -writable -
+    -writeable {
+      #set ropts "-nocommit"
+      set ropts ""
+      set argv [lreplace $argv 1 1]
+    }
+    -nocomp -
+    -nocompress {
+      set compress 0
+      set argv [lreplace $argv 1 1]
+    }
+    -verbose {
+      set verbose 1
+      set argv [lreplace $argv 1 1]
+    }
+    -zip {
+      set type zip
+      set argv [lreplace $argv 1 1]
+    }
+    -uncomp {
+      lappend explist [lindex $argv 2]
+      set argv [lreplace $argv 1 2]
+    }
+    default {
+      lappend syncopts [lindex $argv 1] [lindex $argv 2]
+      set argv [lreplace $argv 1 2]
+    }
+  }
+  set a [lindex $argv 1]
+}
+
+if {![file isdir $idir]} {
+  puts stderr "Input directory not found: $idir"
+  exit 1
+}
+
+if {!$prefix} {
+  regsub @PROG@ $header $prog header
+  regsub @OPTS@ $header $ropts header
+  regsub @TYPE@ $header $type header
+
+  set n [string length $header]
+  while {$n <= 240} {
+    append header ################
+    incr n 16
+  }
+
+  set slop [expr { 15 - (($n + 15) % 16) }]
+  for {set i 0} {$i < $slop} {incr i} {
+    append header #
+  }
+  set n [string length $header]
+  if {$n % 16 != 0} {
+    error "Header size is $n, should be a multiple of 16"
+  }
+}
+
+# pull apart macbinary file, if asked (and if it looks like one)
+if {$macbin} {
+  binary scan $header cc@122cc c1 c2 c3 c4
+  if {$c1 != 0 || $c1 < 0 || $c1 > 63 || $c2 >= 0 || $c3 >= 0} {
+    puts stderr "runtime file is not in MacBinary format"
+    exit 1
+  }
+  binary scan $header a83Ia37Sa2 mb_hd1 mb_dlen mb_hd2 mb_crc mb_end
+  binary scan $header @128a${mb_dlen}a* header mb_tail
+}
+
+if {!$reusefile} {
+  my writefile $out $header
+}
+
+set origsize [file size $out]
+
+switch $tcl_platform(platform) {
+  unix {
+    catch {file attributes $out -permissions +x}
+  }
+  windows {
+    set batfile [file root $out].bat
+    if {![file exists $batfile]} {
+      set fd [open $batfile w]
+      puts -nonewline $fd "@$prog [file tail $out] %1 %2 %3 %4 %5 %6 %7 %8 %9"
+      close $fd
+    }
+  }
+  macintosh {
+    catch {file attributes $out -creator TKd4}
+  }
+}
+
+# 2003-02-08: added code to patch icon in windows executable
+# triggered by existence of tclkit.ico in vfs dir *and* tclkit.ico in orig
+
+# careful: this applies only to windows executables, but the
+# icon replacement can in fact take place on any platform...
+
+if {[info exists origicon] && [file exists [file join $idir tclkit.ico]]} {
+  puts " customizing tclkit.ico in executable"
+  set custicon [my readfile [file join $idir tclkit.ico]]
+  array set newimg [my decICO $custicon]
+  foreach {k v} [decICO $origicon] {
+    if {[info exists newimg($k)]} {
+      set len [string length $v]
+      set pos [string first $v $header]
+      if {$pos < 0} {
+	puts " icon $k: NOT FOUND"
+      } elseif {[string length $newimg($k)] != $len} {
+	puts " icon $k: NOT SAME SIZE"
+      } else {
+	binary scan $header a${pos}a${len}a* prefix - suffix
+	set header "$prefix$newimg($k)$suffix"
+	puts " icon $k: replaced"
+      }
+    }
+  }
+  my writefile $out $header
+}
+
+switch $type {
+  mk4 {
+    vfs::mk4::Mount $out $out
+    set argv $syncopts
+    lappend argv -compress $compress -verbose $verbose -noerror 0 $idir $out
+
+    source [file join [file dirname [info script]] sync.tcl] 
+
+      # leave a marker inside the scripted doc about the header
+      # 2002-07-07, disabled, until need is properly determined
+    if {0 && $prefix} {
+      set ofile [file join $out .original]
+      set fd [open $ofile w]
+      puts $fd $origsize
+      close $fd
+      file mtime $ofile $origtime
+    }
+    
+      # 2003-06-19: new "-uncomp name" option to store specific file(s)
+      #		    in uncompressed form, even if the rest is compressed
+    set o $mk4vfs::compress
+    set mk4vfs::compress 0
+    foreach f $explist {
+      file delete -force [file join $out $f]
+      file copy [file join $idir $f] [file join $out $f]
+    }
+    set mk4vfs::compress $o
+
+    vfs::unmount $out
+  }
+}
+
+# re-assemble mac binary file if we pulled it apart before
+if {[info exists mb_end]} {
+  source [file join [file dirname [info script]] crc16.tcl]
+
+  set newdata [my readfile $out]
+
+  set h $mb_hd1
+  append h [binary format I [string length $newdata]]
+  append h $mb_hd2
+  append h [binary format S [crc::crc-ccitt -seed 0 $h]]
+  append h mb_end
+
+  set fd [open $out w]
+  fconfigure $fd -translation binary
+  puts -nonewline $fd $h
+  puts -nonewline $fd $newdata
+  puts -nonewline $fd $mb_tail
+  close $fd
+}
+
+}
+IDE::TclKitDeployer instproc writefile {name data} {
+  set fd [open $name w]
+  fconfigure $fd -translation binary
+  puts -nonewline $fd $data
+  close $fd
+}
+IDE::TclKitDeployer proc newBrowser {} {
+    if {[catch {package require vfs::mk4}]} {
+        IDE::Dialog error "can not load package vfs::mk4 please adapt your Tcl system for starkit or run XOTclIDE from starkit"
+    } else {
+        my instvar browser
+        if {![info exists browser] || ![Object isobject $browser]} {
+            set browser [my new [Object autoname .kitdeployer]]
+        } else {
+            IDE::Dialog message "Deployer browser is already open"
+        }
+    }
+}
+

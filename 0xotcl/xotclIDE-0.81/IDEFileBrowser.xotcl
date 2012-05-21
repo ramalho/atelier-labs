@@ -1,0 +1,392 @@
+# automatically generated from XOTclIDE
+# script require component {IDECore IDEBaseGUI}
+@ Component IDEFileBrowser {
+description {Just short implementation of Filebrowser.
+It was only developed to have good access to VFS
+(zip and tclkit)
+
+IDE::FileBrowser newBrowser}
+}
+package provide IDEFileBrowser 0.75
+package require IDEBaseGUI
+package require IDECore
+Class IDE::DictionaryList -superclass {::IDE::ListView ::IDE::GUICommands}
+@ ::IDE::DictionaryList idemeta component IDEFileBrowser
+IDE::DictionaryList instproc buttonDoublePush {} {
+    set dic [my selectedItemFirst]
+    if {$dic ne ""} {
+        [my info parent] selectDic $dic
+    }
+}
+IDE::DictionaryList instproc fillMenuStruct ms {
+     $ms addCommand2 {New Folder} [list [[self] info parent] newFolder] 
+     $ms addCommand2 {Manual cd} [list [[self] info parent] manualCD] 
+     $ms addMenuItem [IDE::MenuSeparator new -childof $ms -popdownMenu 1]
+     #$ms addCommand2 {New zip Archive} [list [[self] info parent] newZipArchive] 
+     $ms addCommand2 {New kit Archive} [list [[self] info parent] newKitArchive] 
+     $ms addMenuItem [IDE::MenuSeparator new -childof $ms -popdownMenu 1]
+     $ms addCommand2 {Refresh} [list [[self] info parent] refreshFiles] 
+}
+IDE::DictionaryList instproc getMenuStruct {} {
+    IDE::MenuStruct create [self]::ms Dictionary 0
+}
+Class IDE::FileBrowser -superclass ::IDE::Browser
+@ ::IDE::FileBrowser idemeta categories {dic-actions init-release vfs-actions file-actions}
+@ ::IDE::FileBrowser idemeta categoriesMethods {{changeToHome upDictionary changeDic selectDic changeToWorking manualCD} {getTitle destroy specificInit} {newKitArchive newFolder newZipArchive newMount} {cutFiles copyFiles deleteFiles pasteFiles canPaste}}
+@ ::IDE::FileBrowser idemeta component IDEFileBrowser
+IDE::FileBrowser instproc backHistory {} {
+    my instvar history historyIndex currentDic
+    if {$historyIndex>0} {
+        incr historyIndex -1
+        set currentDic [lindex $history $historyIndex]
+        my refreshFiles 0
+    }
+}
+IDE::FileBrowser instproc canPaste {} {
+    expr {[my exists action] && [my set action] ne ""}
+}
+IDE::FileBrowser instproc changeDic dic {
+    my instvar currentDic 
+    set currentDic $dic
+    my refreshFiles
+}
+IDE::FileBrowser instproc changeToHome {} {
+    global env
+    my set currentDic $env(HOME)
+    my refreshFiles
+}
+IDE::FileBrowser instproc changeToWorking {} {
+    my set currentDic [pwd]
+    my refreshFiles
+}
+IDE::FileBrowser instproc copyFiles files {
+    my instvar action pfiles pdic currentDic
+    set action copy
+    set pdic $currentDic
+    set pfiles $files
+}
+IDE::FileBrowser instproc cutFiles files {
+    my instvar action pfiles pdic currentDic
+    set action cut
+    set pdic $currentDic
+    set pfiles $files
+}
+IDE::FileBrowser instproc deleteFiles files {
+    my instvar action pfiles currentDic
+    if {[IDE::Dialog yesNo "Really delete [llength $files] files?"]} {
+        foreach f $files {
+            file delete -force [file join $currentDic $f]
+        }
+    }
+    my refreshFiles
+}
+IDE::FileBrowser instproc destroy {} {
+    my instvar mountsTo
+    if {[info exists mountsTo]} {
+        foreach f $mountsTo {
+            vfs::unmount $f
+        }
+    }
+    next
+}
+IDE::FileBrowser instproc forwardHistory {} {
+    my instvar history historyIndex currentDic
+    if {$historyIndex<[llength $history]-1} {
+        incr historyIndex
+        set currentDic [lindex $history $historyIndex]
+        my refreshFiles 0
+    }
+}
+IDE::FileBrowser instproc getTitle {} {
+    return "File Browser"
+}
+IDE::FileBrowser instproc manualCD {} {
+    set ncd [IDE::IDialogEntry getValue "Change to folder"]
+    if {$ncd ne ""} {
+        if {![file isdirectory $ncd]} {
+            IDE::Dialog message "'$ncd' is not directory"
+        } else {
+            my set currentDic $ncd
+            my refreshFiles
+        }
+    }
+}
+IDE::FileBrowser instproc newFolder {} {
+     set nf [IDE::IDialogEntry getValue "New Folder Name"]
+     if {$nf ne ""} {
+         my instvar currentDic
+         file mkdir [file join $currentDic $nf]
+         my refreshFiles
+     }
+}
+IDE::FileBrowser instproc newKitArchive {} {
+     set nf [IDE::IDialogEntry getValue "New Kit Archive Name (mk4 vfs)"]
+     if {$nf ne ""} {
+         my instvar currentDic
+         if {[file exists [file join $currentDic $nf]]} {
+             IDE::Dialog error "file $nf already exists"
+         } else {
+             my newMount mk4 [file join $currentDic $nf] $nf
+         }
+     }
+}
+IDE::FileBrowser instproc newMount {type from to} {
+    my instvar mountsFrom mountsTo
+    if {[my exists mountFrom] && [lsearch  $mountsFrom $from]>=0} {
+        IDE::Dialog error "$from already mounted"
+        return
+    }
+    if {[my exists mountsTo] && [lsearch $mountsTo $to]>=0} {
+        set to [Object autoname $to]
+    }
+    package require vfs::$type
+    vfs::${type}::Mount $from $to
+    lappend mountsFrom $from
+    lappend mountsTo $to
+    my set currentDic $from
+    my refreshFiles
+}
+IDE::FileBrowser instproc newZipArchive {} {
+     set nf [IDE::IDialogEntry getValue "New Zip Archive Name"]
+     if {$nf ne ""} {
+         my instvar currentDic
+         set fname [file join $currentDic $nf]
+         if {[file exists $fname]} {
+             IDE::Dialog error "file $nf already exists"
+         } else {
+             my newMount zip $fname $nf
+         }
+     }
+}
+IDE::FileBrowser instproc pasteFiles {} {
+    my instvar action pfiles pdic currentDic
+    if {$action eq "copy"} {
+        set op copy
+    } else {
+        set op rename
+    }
+    set yesToAll 0
+    foreach f $pfiles {
+        if {!$yesToAll && [file exists [file join $currentDic $f]]} {
+            set ret [tk_dialog .dlg "file paste" "file '$f' already exists. overwrite it?" {} Yes Yes No YesToAll Cancel]
+            if {$ret eq "No"} continue
+            if {$ret eq "Cancel"} break
+            if {$ret eq "YesToAll"} {
+                set yesToAll 1            
+            }
+        }
+        file $op -force -- [file join $pdic $f] $currentDic
+    }
+    if {$action eq "cut"} {
+        set action {}
+    }
+    my refreshFiles
+}
+IDE::FileBrowser instproc refreshFiles {{updatehistory 1}} {
+    my instvar currentDic win history historyIndex
+    if {$updatehistory &&  [lindex $history $historyIndex] ne $currentDic} {
+        incr historyIndex
+        set history [linsert $history $historyIndex $currentDic]
+    }                
+    $win.current configure -text $currentDic
+    set dirs [list]
+    foreach f [glob -nocomplain -directory $currentDic -types d *] {
+        lappend dirs [file tail $f]
+    }
+    [self]::@directories setList $dirs
+    set files [list]
+    foreach f [glob -nocomplain -directory $currentDic *] {
+        lappend files [file tail $f]
+    }
+    set files [lsort $files]
+    [self]::@files setListUnsorted $files
+    foreach d $dirs {
+        [self]::@files markItemIndexForeGround [lsearch $files $d] blue
+    }
+    set m [list]
+    if {[my exists mountsTo]} {
+        set m [my set mountsTo]
+    }
+    [self]::@volumes setListUnsorted [concat [lsort [file volumes]] $m]
+}
+IDE::FileBrowser instproc selectDic dic {
+    my instvar currentDic 
+    set currentDic [file join $currentDic $dic]
+    my refreshFiles
+}
+IDE::FileBrowser instproc specificInit {} {
+    my instvar win currentDic history historyIndex
+    global tcl_platform
+    set currentDic [file normalize [pwd]]
+    set history [list $currentDic]
+    set historyIndex 0
+    label $win.current -relief solid -border 2 -width 50 -anchor w -text $currentDic
+    frame $win.buttons
+    button $win.buttons.up -text "up dictionary" -command [list [self] upDictionary]
+    button $win.buttons.home -text "home" -command [list [self] changeToHome]
+    button $win.buttons.back -text "<<" -command [list [self] backHistory]
+    button $win.buttons.forward -text ">>" -command [list [self] forwardHistory]
+    button $win.buttons.working -text "working dir" -command [list [self] changeToWorking]
+    pack $win.buttons.up $win.buttons.home $win.buttons.back $win.buttons.forward $win.buttons.working -side left -anchor w
+    panedwindow $win.f -orient horizontal
+    frame $win.f.df
+    IDE::MountList [self]::@volumes $win.f.df.volumes -height 5 -label "Volumes and Mounts"
+    IDE::DictionaryList [self]::@directories $win.f.df.directories -label Directories
+    pack $win.f.df.volumes  -fill both
+    pack $win.f.df.directories -fill both -expand yes
+    $win.f add $win.f.df -sticky news -width 200
+    IDE::FileList [self]::@files $win.f.files -multiselect 1 -label Files
+    $win.f add $win.f.files -sticky news
+    pack $win.current -anchor w -fill x
+    pack $win.buttons -anchor w
+    pack $win.f -expand yes -fill both
+    my refreshFiles
+    next
+}
+IDE::FileBrowser instproc unmountFile to {
+    my instvar mountsFrom mountsTo currentDic
+    set index [lsearch $mountsTo $to]
+    if {$index>=0} {
+        set mountsFrom [lreplace $mountsFrom $index $index]
+        set mountsTo [lreplace $mountsTo $index $index]
+        vfs::unmount $to
+        if {[string match ${currentDic}* $to]} {
+            my changeToHome
+        } else {
+            my refreshFiles        
+        }
+    }
+}
+IDE::FileBrowser instproc upDictionary {} {
+    my instvar currentDic 
+    set currentDic [file dirname $currentDic]
+    my refreshFiles
+}
+IDE::FileBrowser proc newBrowser {} {
+    # File Browser is a singleton. becauso can not ease share mount point and copy puffer
+    if {![Object isobject filebrowser]} {
+        my create filebrowser .filebrowser
+    }
+}
+Class IDE::FileList -superclass {::IDE::ListView ::IDE::GUICommands}
+@ ::IDE::FileList idemeta categories {file-actions vfs-actions init-release}
+@ ::IDE::FileList idemeta categoriesMethods {{pasteFiles cutFiles copyFiles canPaste renameFile} {mountKit mountZip} {getMenuStruct fillMenuStruct}}
+@ ::IDE::FileList idemeta component IDEFileBrowser
+IDE::FileList instproc buttonDoublePush {} {
+    set dic [my selectedItemFirst]
+    if {$dic ne ""} {
+        [my info parent] selectDic $dic
+    }
+}
+IDE::FileList instproc canPaste {} {
+    [my info parent] canPaste
+}
+IDE::FileList instproc copyFiles files {
+    [my info parent] copyFiles $files
+}
+IDE::FileList instproc cutFiles files {
+    [my info parent] cutFiles $files
+}
+IDE::FileList instproc deleteFiles files {
+    [my info parent] deleteFiles $files
+}
+IDE::FileList instproc fillMenuStruct ms {
+     $ms enablementHandler [self]   
+     $ms addCommand2 {Copy} [list [self] dispatchWithSelectedAll copyFiles] isValidSelection
+     $ms addCommand2 {Cut} [list [self] dispatchWithSelectedAll cutFiles] isValidSelection
+     $ms addCommand2 {Paste} [list [self] pasteFiles] canPaste
+     $ms addMenuItem [IDE::MenuSeparator new -childof $ms -popdownMenu 1]
+     $ms addCommand2 {Delete} [list [self] dispatchWithSelectedAll deleteFiles] isValidSelection
+     $ms addMenuItem [IDE::MenuSeparator new -childof $ms -popdownMenu 1]
+     $ms addCommand2 {Select All} [list [self] selectAll]
+     $ms addCommand2 {Select Pattern} [list [self] selectGlob]
+     $ms addCommand2 {Edit in Workspace} [list [self] dispatchWithSelected viewFile] isValidSelection
+     $ms addCommand2 {Rename} [list [self] dispatchWithSelected renameFile] isValidSelection
+     $ms addCommand2 {Properties} [list [self] dispatchWithSelected showProperties] isValidSelection
+     
+     $ms addMenuItem [IDE::MenuSeparator new -childof $ms -popdownMenu 1]
+     $ms addCommand2 {Mount Zip} [list [self] dispatchWithSelected mountZip] {isValidSelection isSelectionFile}
+     $ms addCommand2 {Mount Kit} [list [self] dispatchWithSelected mountKit] {isValidSelection isSelectionFile}
+}
+IDE::FileList instproc getCurrent {} {
+    [my info parent] set currentDic
+}
+IDE::FileList instproc getMenuStruct {} {
+    IDE::MenuStruct create [self]::ms File 0
+}
+IDE::FileList instproc isSelectionFile {} {
+    set first [my selectedItemFirst]
+    file isfile [file join [my getCurrent] $first]
+}
+IDE::FileList instproc mountKit file {
+    [my info parent] newMount mk4 [file join [[my info parent] set currentDic] $file] $file
+}
+IDE::FileList instproc mountZip file {
+    [my info parent] newMount zip [file join [[my info parent] set currentDic] $file] $file
+}
+IDE::FileList instproc pasteFiles {} {
+    [my info parent] pasteFiles
+}
+IDE::FileList instproc renameFile file {
+    set dir [my getCurrent]
+    set newname [IDE::IDialogEntry "new name"]
+    if {$newname ne ""} {
+        if {[file exists [file join $dir $newname]]} {
+            IDE::Dialog error "file $newname already exists"
+        } else {
+            file rename [file join $dir $file] [file join $dir $newname] 
+        }
+    }
+}
+IDE::FileList instproc selectAll {} {
+    # !! Tk specific
+    my instvar win
+    $win.listbox selection set 0 end
+}
+IDE::FileList instproc selectGlob args {
+    set pat [IDE::IDialogEntry getValue "Give select patern" *.*]
+    if {$pat ne ""} {
+        my instvar win
+        foreach i [lsearch -glob -all [my getList] $pat] {
+           $win.listbox selection set $i
+        }
+    }
+}
+IDE::FileList instproc showProperties file {
+    set dir [my getCurrent]
+    set fname [file join $dir $file]
+    IDE::Dialog message "name: $file\ntype: [file type $fname]\nsize: [file size $fname]\ntime: [clock format [file mtime $fname]]"
+}
+IDE::FileList instproc viewFile file {
+    set w [IDE::Transcript newBrowser]
+    $w @editor openFile [file join [[my info parent] set currentDic] $file]
+}
+Class IDE::MountList -superclass {::IDE::ListView ::IDE::GUICommands}
+@ ::IDE::MountList idemeta component IDEFileBrowser
+IDE::MountList instproc buttonDoublePush {} {
+    set item [my selectedItemFirst]
+    if {$item ne ""} {
+        [my info parent] changeDic $item
+    }
+}
+IDE::MountList instproc fillMenuStruct ms {
+     $ms enablementHandler [self]   
+     $ms addCommand2 {Unmount} [list [self] dispatchWithSelectedAll unmountFile] isMountfile
+}
+IDE::MountList instproc getMenuStruct {} {
+    IDE::MenuStruct create [self]::ms Mount 0
+}
+IDE::MountList instproc isMountfile {} {
+    set act [my selectedItemFirst]
+    if {$act ne ""} {
+        set p [my info parent]
+        if {[$p exists mountTo] && [lsearch [$p set mountTo] $act]>=0} {
+            return 1
+        }
+    }
+    return 1
+}
+IDE::MountList instproc unmountFile file {
+    [my info parent] unmountFile $file
+}
+

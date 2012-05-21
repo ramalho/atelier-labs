@@ -1,0 +1,78 @@
+<html>
+
+<script>
+var selecionada = {R:0, G:0, B:0}
+var visorNumerico=null
+var mistura=null
+
+function paraHex(valor) {
+    var hex = parseInt(valor).toString(16)
+    return (hex.length == 1) ? '0' + hex : hex
+}
+
+function faixaClick(evt){
+    var cor=evt.target.id.charAt(0)
+    var valor=evt.target.id.substr(1)
+    selecionada[cor] = valor
+    
+    var rgbStr=evt.target.style.backgroundColor
+    var amostra=document.getElementById('amostra'+cor)
+    amostra.style.backgroundColor=rgbStr
+    
+    rgbStr='rgb('+selecionada.R+','+selecionada.G+','+selecionada.B+')'
+    mistura.style.backgroundColor=rgbStr
+
+    rgbStr += ' #' + paraHex(selecionada.R)+paraHex(selecionada.G)+paraHex(selecionada.B)
+    visorNumerico.innerHTML=rgbStr
+}
+
+function degrade(cor){
+    var slider=document.getElementById('slider'+cor)
+    for(var i=0; i<256; i++){
+        var faixa=document.createElement('div')
+        if      (cor=='R'){faixa.style.backgroundColor="rgb("+i+",0,0)"}
+        else if (cor=='G'){faixa.style.backgroundColor="rgb(0,"+i+",0)"}
+        else if (cor=='B'){faixa.style.backgroundColor="rgb(0,0,"+i+")"}
+        faixa.style.height="1px"
+        faixa.id=cor+i
+        faixa.onclick=faixaClick
+        faixa.onmouseover=faixaClick
+        slider.appendChild(faixa)
+    }   
+}
+
+function montar(cor){
+    degrade(cor)
+    var slider=document.getElementById('slider'+cor)
+}
+
+    
+function init(){
+    montar("R")
+    montar("G")
+    montar("B")
+    mistura=document.getElementById('mistura')
+    visorNumerico=document.getElementById('visorNumerico')
+
+}
+</script>
+
+
+<body bgcolor="#777777" onload="init()">
+<div id="sliderR" style="position:absolute; top:100px; left:10px; width:80px; height:256px;">  </div>
+<div id="amostraR" style="position:absolute; top:10px; left:10px; width:80px; height:80px;
+    background-color:#000000;">  </div>
+<div id="sliderG" style="position:absolute; top:100px; left:100px; width:80px; height:256px;">  </div>
+<div id="amostraG" style="position:absolute; top:10px; left:100px; width:80px; height:80px;
+    background-color:#000000;">  </div>
+<div id="sliderB" style="position:absolute; top:100px; left:190px; width:80px; height:256px;">  </div>
+<div id="amostraB" style="position:absolute; top:10px; left:190px; width:80px; height:80px;
+    background-color:#000000;">  </div>
+
+
+<div id="mistura" style="position:absolute; top:10px; left:280px; width:512px; height:512px; background-color:#000000;"> </div>
+
+<div id="visorNumerico" style="position:absolute; top:366px; left:10px; width:260px; height:30px; background-color:#ffffff;"> </div>
+
+</body>
+</html>

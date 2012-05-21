@@ -1,0 +1,825 @@
+# automatically generated from XOTclIDE
+@ Component IDEStart {
+description {This application is able to load all XotclIDE from DB
+therefore is is not depend on another XotclIDE components.
+
+You can load IDE form Database only with this applikation
+
+Here are also some redundant code the same as in IDEBaseGUI
+
+Using:
+
+package require IDEStart
+IDEStarter startIDEFromDB}
+}
+package provide IDEStart 0.80
+@ Object IDEPreferences {
+description {Hanlde preferences of xotcl
+
+on unix the preferences are saved as hile .xotclide in home dictionary
+on windows the registry are used.
+
+Now the preferences are only used to specify data base
+connection for version system.
+The prefereces can by set by installation tool}
+}
+Object IDEPreferences
+@ ::IDEPreferences idemeta categoriesMethodsProcs {{prefFileName setDefaultPreferences} {windowsRegKey windowsSavePrefs windowsLoadPrefs windowsRegistryKey} getDBLoginParameters}
+@ ::IDEPreferences idemeta categoriesProcs {constans windows db-prefs}
+@ ::IDEPreferences idemeta component IDEStart
+IDEPreferences proc getDBLoginParameters args {
+    my getParameter connection
+}
+IDEPreferences proc getParameter key {
+    if {[my exists preferences($key)]} {
+        return [my set preferences($key)]
+    }
+    return
+}
+IDEPreferences proc loadPreferences {} {
+    global tcl_platform
+    my setDefaultPreferences
+    if {$tcl_platform(platform) eq "windows"} {
+        my windowsLoadPrefs
+    } else {
+        set prefFileName [file join ~  [my prefFileName]]
+        if {[file exists $prefFileName]} {
+            my loadPreferencesFromFile $prefFileName
+        }
+    }
+}
+IDEPreferences proc loadPreferencesFromFile file {
+    my instvar preferences
+    set preffile [open $file r]
+    while {[gets $preffile Zeile] >= 0} {
+        if {[string index [string trim $Zeile] 0] eq "#"} continue
+        set preferences([lindex $Zeile 0]) [lindex $Zeile 1]
+    }
+    close $preffile
+}
+IDEPreferences proc prefFileName {} {
+    return .xotclide
+}
+IDEPreferences proc savePreferences {} {
+    global errorInfo tcl_platform
+    my instvar preferences
+    if {$tcl_platform(platform) eq "windows"} {
+        my windowsSavePrefs
+    } else {
+        my savePreferencesAsFile [file join ~ [my prefFileName]]
+    }
+}
+IDEPreferences proc savePreferencesAsFile file {
+    my instvar preferences
+    set ret [catch {set preffile [open $file w]} openError]
+    if {$ret != 0} {
+        tk_messageBox -title Error -message "Can not open preference file $openError"  -icon error -type ok
+        return
+    }
+    set indicator [array startsearch preferences]
+    while {[array anymore preferences $indicator]} {
+        set elem [array nextelement preferences $indicator]
+        puts $preffile "$elem [list $preferences($elem)]"
+    }
+    array donesearch preferences $indicator
+    close $preffile
+}
+IDEPreferences proc setDefaultPreferences {} {
+    my array set preferences {
+        textfont {-family Courier -size -14}
+        listboxfont {-family Helvetica -size -12 -weight bold}
+        textcolor {}
+        listboxcolor {}
+    }
+}
+IDEPreferences proc setParameter {key param} {
+    my set preferences($key) $param
+}
+IDEPreferences proc windowsLoadPrefs {} {
+    if {![catch {package require registry}]} {
+        my instvar preferences
+        set reg_path [my windowsRegKey]
+        if {![catch {set values [registry values $reg_path]}]} {
+            foreach val $values {
+                set preferences($val) [registry get $reg_path $val]
+            }
+        }
+    }
+}
+IDEPreferences proc windowsRegKey {} {
+    return {HKEY_CURRENT_USER\Software\xotclide}
+}
+IDEPreferences proc windowsRegistryKey {} {
+    return HKEY_CURRENT_USER\Software\xotclide
+}
+IDEPreferences proc windowsSavePrefs {} {
+    if {![catch {package require registry}]} {
+        my instvar preferences
+        set reg_path [my windowsRegKey]
+        set indicator [array startsearch preferences]
+        while {[array anymore preferences $indicator]} {
+            set elem [array nextelement preferences $indicator]
+            registry set $reg_path $elem $preferences($elem)
+        }
+        array donesearch preferences $indicator
+    }
+}
+@ Object IDEStarter {
+description {This object handle starting xotclide from differents context
+It read also the line arguments that can influence starting process or
+cause specified actions.
+The IDEStater can by used to load another application from Version System.
+It has the rolle of starting module for thin client systems.
+
+Followin Starting options are possibly.
+1. Starting from source without Version System
+2. Starting from source with Version System
+3. Starting from Version System with Version System
+4. Starting from foreign Application (IDE as debbuging tool)
+5. Loading and Starting foreign application from version system (data base)
+
+Test von Umlauten äöüß}
+}
+Object IDEStarter
+@ ::IDEStarter idemeta categoriesMethodsProcs {{coreComponents argumentsDescription} {loadObject loadComponent} {startIDEFromDB startIDEWithDB startIDEOnly startLoader startConfId startIDEFromApp} {initProcWrappersStruct isDevelopingMode} {establishDBConnection getConnectionObject initializeAfterLoad loadIDECoreFromDB startUpIDE closeWaitDialog setWaitDialog} {loadPreferences parseCommandLineArgs showHelpAndExit} {dumpCompId dumpConfId getComponentBody getComponentsForConfigmapId getConfigMapBodyDeep getObjectBody getSubconfigsForId}}
+@ ::IDEStarter idemeta categoriesProcs {constans loading-vc start-up private starting-intern arguments-prefs dumping}
+@ ::IDEStarter idemeta component IDEStart
+IDEStarter proc argumentsDescription {} {
+    return {
+        {-ignoreprefs bool {Do not read preferences}}
+        {-nodialog bool {Try to entablish database connection without user dialog}}
+        {-preferences string {list for overloading preferences f.e "interface mysqltcl dbank xotcllib"}}
+        {-nosynchronize bool {do not synchronize Core Components}}
+        {-configmap string {Configuration Map File}}
+        {-configmapdb string {Configuration Map in version control}}
+        {-help action {show parameter list and exit} showHelpAndExit}
+        {-dumpcompid paraction {dump component with id to stdout} dumpCompId}
+        {-dumpconfid paraction {dump configuration with id to stdout} dumpConfId}
+        {-startconfid paraction {start application from configmap} startConfId}
+        {-preloadcomponents string {Preload component on start from DB}}
+        {-preexec string {Command which is evaluated upon starting}}
+        {-startMode string {Options used for kit-version to specify start mode: ideOnly ideDB ideFromDB installVC}}
+    }
+}
+IDEStarter proc baseComponents {} {
+    return {
+        IDECore
+        IDETclParser
+        IDEBaseGUI
+        IDEView
+        IDEEditor
+        IDEDebug
+        IDEErrorReporter
+    }
+}
+IDEStarter proc closeWaitDialog {} {
+    ::destroy .wait
+}
+IDEStarter proc coreComponents {} {
+    return [concat [my baseComponents] {
+        IDEPersistence
+        IDEPersistenceGUI
+        IDEPersistenceAdd
+        }]
+}
+IDEStarter proc dumpCompId id {
+    my loadPreferences
+    my establishDBConnection
+    puts [my getComponentBody $id]
+    exit
+}
+IDEStarter proc dumpConfId id {
+    my loadPreferences
+    my establishDBConnection
+    puts [my getConfigMapBodyDeep $id]
+    exit
+}
+IDEStarter proc establishDBConnection {} {
+    my instvar sqlhandle
+    while 1 {
+        if {[my set nodialog]} {
+            set sqlhandle [my getConnectionObject]
+            if {$sqlhandle eq ""} {
+                error "no interface specified"
+            }
+            $sqlhandle connect [IDEPreferences getParameter connection]
+        } else {
+            set sqlhandle [IDEDBConnectDialog setConnectionOn [my getConnectionObject] [IDEPreferences getParameter connection]]
+        }
+        if {$sqlhandle eq "" || ![$sqlhandle isConnected]} {
+            set res [tk_messageBox -title {Choose} -message "No connection to version control database. Do you want to have another try. Answer 'no' will exit the system." -icon question -type yesno]
+            if {$res eq "no"} {
+                exit 1
+            }
+        } else {
+            return
+        }
+    }
+}
+IDEStarter proc getComponentBody componentid {
+    [self] instvar sqlhandle initializeList
+    set initializeList {}
+    set body {}
+    set objects [$sqlhandle queryList "SELECT Object.objectid,Object.defbody,Object.metadata,Object.name FROM ComponentObject,Object where componentid=$componentid and ComponentObject.objectid=Object.objectid order by ComponentObject.deforder"]
+    foreach row $objects {
+        set id [lindex $row 0]
+        set defbody [lindex $row 1]
+        set metadata [lindex $row 2]
+        set objName [lindex $row 3]
+        # defbody eval return the object name
+        append body $defbody
+        if {$metadata ne ""} {
+            append body $metadata
+        }
+        append body [my getObjectBody $id $objName]
+    }
+    #package provide $name 1
+    foreach imethod $initializeList {
+        append body "$imethod initializeAfterLoad\n"
+    }
+    return $body
+}
+IDEStarter proc getComponentsForConfigmapId id {
+    my instvar sqlhandle
+    $sqlhandle queryList "SELECT cp.name,nm.componentid FROM ConfigmapComponent nm, Component cp WHERE cp.componentid=nm.componentid AND nm.configmapid=$id ORDER BY nm.loadorder"
+}
+IDEStarter proc getConfigMapBodyDeep id {
+    set script {}
+    foreach child [my getSubconfigsForId $id] {
+        append script "# Subconfigmap [lindex $child 0]\n"
+        append script [my getConfigMapBodyDeep [lindex $child 1]]
+    }
+    foreach component [my getComponentsForConfigmapId $id] {
+        append script "# component [lindex $component 0]\n"
+        append script [my getComponentBody [lindex $component 1]]
+    }
+    return $script
+}
+IDEStarter proc getConnectionObject {} {
+    set interface [IDEPreferences getParameter interface]
+    if {$interface eq ""} return
+    set iclass [Sqlinterface loadInterface $interface]
+    return [$iclass new]
+}
+IDEStarter proc getObjectBody {objectid objName} {
+    my instvar sqlhandle initializeList
+    set body {}
+    set rows [$sqlhandle queryList "SELECT Method.body,Method.category,Method.type,Method.name FROM ObjectMethod,Method where ObjectMethod.objectid=$objectid and ObjectMethod.methodid=Method.methodid"]
+    foreach row $rows {
+        set category [lindex $row 1]
+        set type [lindex $row 2]
+        set name [lindex $row 3]
+        append body [lindex $row 0]
+        if {$type eq "Class" && $name eq "initializeAfterLoad"} {
+            lappend initializeList $objName
+        }
+    }
+    return $body
+}
+IDEStarter proc getSubconfigsForId id {
+    my instvar sqlhandle
+    $sqlhandle queryList "SELECT cm.name,nm.configmapchildid FROM ConfigmapChildren nm, Configmap cm WHERE cm.configmapid=nm.configmapid AND nm.configmapid=$id ORDER BY nm.loadorder"
+}
+IDEStarter proc hasDBConnection {} {
+    my instvar sqlhandle
+    expr [info exists $sqlhandle] && [$sqlhandle isConnected]
+}
+IDEStarter proc initProcWrappersStruct {} {
+    my instvar tclmethodArr
+    if {[array exists tclmethodArr]} {
+        IDE::ProcsGroup buildStuctFromArray tclmethodArr
+        unset tclmethodArr
+    }
+}
+IDEStarter proc initializeAfterLoad {} {
+    my set ignoreprefs 0
+    my set nodialog 0
+    my set withdebugger 0
+    my set isDevelopingMode 1
+}
+IDEStarter proc invokeMenu {} {
+    if {[winfo exists .startmenu]} {
+        ::destroy .startmenu
+    }
+    switch [my set idestart] {
+        1 {
+            package require IDECore
+            package require IDEBaseGUI
+            package require IDEView
+            package require IDETclParser
+            package require IDEEditor
+            package require IDEDebug
+            package require IDEErrorReporter
+            my startIDEOnly
+        }
+        2 {
+            package require IDECore
+            package require IDEBaseGUI
+            package require IDEView
+            package require IDETclParser
+            package require IDEEditor
+            package require IDEDebug
+            package require IDEErrorReporter
+
+            package require xdobry::sql
+            package require IDEPersistence
+            package require IDEPersistenceGUI
+            package require IDEPersistenceAdd
+            my startIDEWithDB
+        }
+        3 {
+            package require xdobry::sql
+            my startIDEFromDB
+        }
+        4 {
+            package require IDEVCInstaller
+            package require IDEBaseGUI
+            package require IDEView
+            package require xdobry::sql
+
+            IDE::InstallerGUI installer .
+        }
+    }
+}
+IDEStarter proc isDevelopingMode {} {
+    if {[my exists isDevelopingMode]} {
+        return [my set isDevelopingMode]
+    } else  {
+        return 1
+    }
+}
+IDEStarter proc loadComponent {name {componentid newest}} {
+    my instvar sqlhandle IDEdeveloping initializeList
+    if {[$sqlhandle istype XOMetakit]} {
+        my loadComponentFromMetakit $name $componentid
+        return
+    }
+    set initializeList {}
+    if {$componentid eq "newest"} {
+        set componentid [lindex [$sqlhandle queryList "select max(componentid) from Component where name='$name'"] 0]
+        puts "newest component $name is $componentid"
+    }
+    set objects [$sqlhandle queryList "SELECT Object.objectid,Object.defbody,Object.metadata,Object.name FROM ComponentObject,Object where componentid=$componentid and ComponentObject.objectid=Object.objectid order by ComponentObject.deforder"]
+    puts "loading component $componentid $name"
+    foreach row $objects {
+        set id [lindex $row 0]
+        #puts "loading object $id"
+        set defbody [lindex $row 1]
+        set metadata [lindex $row 2]
+        set objName [lindex $row 3]
+        # defbody eval return the object name
+        set object [namespace eval :: $defbody]
+        if {[my isDevelopingMode] && $object ne ""} {
+            $object setMetadata component $name
+        }
+        if {$metadata ne ""} {
+            eval $metadata
+        }
+        my loadObject $id $objName $name
+    }
+    # !!! compute right version number
+    package forget $name
+    package provide $name 1
+    foreach imethod $initializeList {
+        if {[catch {$imethod initializeAfterLoad}]} {
+            global errorInfo
+            puts "Error by calling $imethod initializeAfterLoad $errorInfo"
+        }
+    }
+}
+IDEStarter proc loadComponentFromAny name {
+    if {[my exists sqlhandle]} {
+        if {[IDE::Component getCompObjectForNameIfExist $name] eq ""} {
+            my loadComponent $name
+        }
+    } else {
+        package require $name
+    }
+}
+IDEStarter proc loadComponentFromMetakit {name {componentid newest}} {
+    my instvar sqlhandle IDEdeveloping initializeList
+    set initializeList {}
+    set db [$sqlhandle set handle]
+    if {$componentid eq "newest"} {
+        set componentid [lindex [mk::select $db.Component -exact name $name] end]
+        puts "newest component $name is $componentid"
+    }
+    foreach oid [mk::select $db.Component!$componentid.ComponentObject -sort deforder] {
+        set id [mk::get $db.Component!$componentid.ComponentObject!$oid objectid]
+        set row [mk::get $db.Object!$id defbody metadata name]
+        set defbody [lindex $row 0]
+        set metadata [lindex $row 1]
+        set objName [lindex $row 2]
+        # defbody eval return the object name
+        set object [namespace eval :: $defbody]
+        if {[my isDevelopingMode] && $object ne ""} {
+            $object setMetadata component $name
+        }
+        if {$metadata ne ""} {
+            eval $metadata
+        }
+        my loadObjectFromMetakit $id $objName $name
+    }
+    # !!! compute right version number
+    package forget $name
+    package provide $name 1
+    foreach imethod $initializeList {
+        if {[catch {$imethod initializeAfterLoad}]} {
+            global errorInfo
+            puts "Error by calling $imethod initializeAfterLoad $errorInfo"
+        }
+    }
+}
+IDEStarter proc loadConfigMap {} {
+    my instvar configmap
+    if {![my exists configmap]} {
+        if {![my exists loaded]} {
+            return 0
+        }
+        return 1
+    }
+    if {![file exists $configmap]} {
+        error "can not find file $configmap"
+        return 0
+    }
+    namespace eval :: "source $configmap"
+    global preStartScript startScript componentsToLoad
+    if {![info exists componentsToLoad]} {
+        error "ill configuration map file"
+        return 0
+    }
+    if {[info exists preStartScript] && $preStartScript!={}} {
+        namespace eval :: $preStartScript
+    }
+    set hasDB [my hasDBConnection]
+    foreach comp $componentsToLoad {
+        puts "loading component $comp"
+        if {[llength $comp]>1 || !$hasDB} {
+            set version [lindex $comp 1]
+            if {$comp eq "package" || !$hasDB} {
+                package require [lindex $comp 0]
+            } else {
+                my loadComponent [lindex $comp 0] [lindex $comp 1]
+            }
+        } else {
+            my loadComponent $comp
+        }
+    }
+    if {[info exists startScript] && $startScript!={}} {
+        namespace eval :: $startScript
+    }
+    my set loaded 1
+    return 1
+}
+IDEStarter proc loadConfigMapDevel {} {
+    my instvar configmap configmapdb
+    if {[my exists configmap]} {
+        if {[my exists loaded]} {
+            return
+        }
+        if {![file exists $configmap]} {
+            error "can not find file $configmap"
+            return 0
+        }
+        IDE::SystemConfigMap loadFromFile $configmap
+        IDE::SystemConfigMap loadComponents
+        IDE::System ignoreIDEComponents 1
+    }
+    if {[info exists configmapdb]} {
+        if {[IDE::System isDatabase]} {
+            IDE::SystemConfigMap loadComponentFromAny IDEConfiguration
+            IDE::ConfigmapControler initConfigmaps
+            IDE::ConfigmapControler instvar configmapArr
+            if {[info exists configmapArr($configmapdb)]} {
+                set maxid 0
+                set maxcmap {}
+                foreach cmap  $configmapArr($configmapdb) {
+                    if {[$cmap set configmapid]>$maxid} {
+                        set maxid [$cmap set configmapid]
+                        set maxcmap $cmap
+                    }
+                }
+                $maxcmap loadAndRun
+            } else {
+                puts "Configuration map $configmapdb not found in DB"
+            }
+        } else {
+            puts "Can not load configuration map from DB. IDE started without version control."
+        }
+        IDE::System ignoreIDEComponents 1
+    }
+}
+IDEStarter proc loadExtendedDebugger {} {
+    my instvar withdebugger
+    if {$withdebugger} {
+        my loadComponentFromAny IDEExtendedDebugger
+        IDE::ExtendedDebugger initializeDebugger
+    }
+}
+IDEStarter proc loadIDECoreFromDB {} {
+    foreach comp [my coreComponents] {
+        if {[llength $comp]>1} {
+            my loadComponent [lindex $comp 0] [lindex $comp 1]
+        } else {
+            my loadComponent $comp
+        }
+    }
+}
+IDEStarter proc loadObject {objectid objName compName} {
+    my instvar sqlhandle IDEdeveloping initializeList tclmethodArr
+    puts "load Class $objName"
+    set rows [$sqlhandle queryList "SELECT Method.body,Method.category,Method.type,Method.name FROM ObjectMethod,Method where ObjectMethod.objectid=$objectid and ObjectMethod.methodid=Method.methodid"]
+    foreach row $rows {
+        set category [lindex $row 1]
+        set type [lindex $row 2]
+        set name [lindex $row 3]
+        eval [lindex $row 0]
+        if {$type eq "Class" && $name eq "initializeAfterLoad"} {
+            lappend initializeList $objName
+        }
+        if {[my isDevelopingMode]} {
+            if {$type eq "tclproc"} {
+                set tclmethodArr($name) [list $compName $objName]
+            }
+            if {$category ne ""} {
+                if {$type eq "Class"} {
+                    $objName moveToCategoryB $name $category
+                } elseif {$type eq "Instance"} {
+                    $objName moveToCategory $name $category
+                }
+            }
+        }
+    }
+}
+IDEStarter proc loadObjectFromMetakit {objectid objName compName} {
+    my instvar sqlhandle IDEdeveloping initializeList tclmethodArr
+    set db [$sqlhandle set handle]
+
+    puts "load Class $objName"
+    foreach mid [mk::select $db.Object!$objectid.ObjectMethod] {
+        set methodid [mk::get $db.Object!$objectid.ObjectMethod!$mid methodid]
+        set row [mk::get $db.Method!$methodid body category type name]
+        set category [lindex $row 1]
+        set type [lindex $row 2]
+        set name [lindex $row 3]
+        eval [lindex $row 0]
+        if {$type eq "Class" && $name eq "initializeAfterLoad"} {
+            lappend initializeList $objName
+        }
+        if {[my isDevelopingMode]} {
+            if {$type eq "tclproc"} {
+                set tclmethodArr($name) [list $compName $objName]
+            }
+            if {$category ne ""} {
+                if {$type eq "Class"} {
+                    $objName moveToCategoryB $name $category
+                } elseif {$type eq "Instance"} {
+                    $objName moveToCategory $name $category
+                }
+            }
+        }
+    }
+}
+IDEStarter proc loadPreferences {} {
+    if {![my set ignoreprefs]} {
+        IDEPreferences loadPreferences
+    }
+    if {[my exists preferences]} {
+        foreach {key value} [my set preferences] {
+            IDEPreferences setParameter $key $value
+        }
+    }
+}
+IDEStarter proc parseCommandLineArgs {} {
+    global argv
+    foreach desc [my argumentsDescription] {
+        set argDesc([lindex $desc 0]) [lrange $desc 1 end]
+    }
+    set i 0
+    while {$i<[llength $argv]} {
+        set key [lindex $argv $i]
+        if {![info exists argDesc($key)]} {
+            puts "unknown command line parameter $key"
+            my showHelpAndExit
+        }
+        set type [lindex $argDesc($key) 0]
+        set keyn [string range $key 1 end]
+        switch $type {
+            bool {
+                my set $keyn 1
+            }
+            string {
+                incr i
+                my set $keyn [lindex $argv $i]
+            }
+            action {
+                my [lindex $argDesc($key) 2]
+            }
+            paraction {
+                incr i
+                my [lindex $argDesc($key) 2] [lindex $argv $i]
+            }
+        }
+        incr i
+    }
+}
+IDEStarter proc preexec {} {
+    if { [my exists preexec] } {
+        namespace eval :: [my set preexec]
+    }
+}
+IDEStarter proc preloadComponents args {
+    if { ![my exists preloadcomponents] } return
+    foreach component [my set preloadcomponents] {
+        IDE::ComponentPersistence loadNameVersionId $component [IDE::ComponentPersistence questIdForComponentName $component] {}
+    }
+    my unset preloadcomponents
+}
+IDEStarter proc requireBaseComponents {} {
+    foreach c [my baseComponents] {
+        package require $c
+    }
+}
+IDEStarter proc setWaitDialog {} {
+    toplevel .wait
+    label .wait.label -text "Wait. XOTclIDE is loading ..."
+    set x [expr [winfo screenwidth .wait]/2 - 150]
+    set y [expr [winfo screenheight .wait]/2 - 100]
+    wm geom .wait +$x+$y
+    pack .wait.label -padx 50 -pady 50
+    wm withdraw .
+    update idletasks
+}
+IDEStarter proc showHelpAndExit {} {
+    puts "Following command line parameter are supported:"
+    foreach desc [my argumentsDescription] {
+        puts [join $desc " : "]
+    }
+    exit
+}
+IDEStarter proc startConfId id {
+    my instvar sqlhandle
+    my loadPreferences
+    my establishDBConnection
+    set scripts [lindex [$sqlhandle queryList "SELECT prescript,postscript FROM Configmap WHERE configmapid=$id"] 0]
+    my set loaded 1
+    namespace eval :: [lindex $scripts 0]
+    namespace eval :: [my getConfigMapBodyDeep $id]
+    $sqlhandle destroy
+    namespace eval :: [lindex $scripts 1]
+}
+IDEStarter proc startFromMenu {{tclkitMessage 0}} {
+    my requireNamespace
+    wm withdraw .
+    set win [toplevel .startmenu]
+    my set idestart 1
+    my set withdebugger 0
+    my parseCommandLineArgs
+    my instvar startMode idestart
+    if {[info exists startMode]} {
+        switch $startMode {
+            ideOnly {
+                set idestart 1
+            }
+            ideDB {
+                set idestart 2
+            }
+            ideFromDB {
+                set idestart 3
+            }
+            installVC {
+                set idestart 4
+            }
+            default {
+                error "unrecognized startMode use: ideOnly | ideDB | ideFromDB | installVC"
+            }
+        }
+        my invokeMenu
+        return
+    }
+    if {$tclkitMessage} {
+        message $win.message -text "This is the tclkit wrapped XOTclIDE. The wrapped version do not contain all components and futures of XOTclIDE. To get full documentation check http://www.xdobry.de/xotclIDE. This wrapper contain sqlite database that is suitable for installing and running version control. There are another adapter for mysql, postgres, win odbc not contained in this wrapper.\nHave fun and report bugs" -width 350
+        pack $win.message -fill x -expand yes
+    }
+    wm protocol .startmenu WM_DELETE_WINDOW exit
+    radiobutton $win.startnormal -text {Start simple IDE (without Version Control)} -variable [self]::idestart -value 1
+    radiobutton $win.startwithvc -text {Start IDE with Version Control} -variable [self]::idestart -value 2
+    radiobutton $win.startfromvc -text {Start IDE load all from Version Control} -variable [self]::idestart -value 3
+    radiobutton $win.startinstallvc -text {Install Version Control Database (relational database)} -variable [self]::idestart -value 4
+    checkbutton $win.loadExtDebugger -text {Load ATK Debugger require patched Tcl} -variable [self]::withdebugger
+    button $win.sbutton -text OK -command [list [self] invokeMenu]
+    pack $win.startnormal $win.startwithvc $win.startfromvc $win.startinstallvc $win.loadExtDebugger $win.sbutton -anchor w
+}
+IDEStarter proc startIDEFromApp {} {
+    my requireBaseComponents
+    IDE initSystem
+    IDE::Component initFromInterpreter
+    IDE::CommentsContainer parseAndCleanMeta
+    IDE::CommentsContainer makeTclGroupsFromMeta
+
+    IDE::CompBrowser newBrowser
+}
+@ IDEStarter proc startIDEFromDB {} {
+description {Start Up System with Database loaded from Database (selfdevelop mode)}
+}
+IDEStarter proc startIDEFromDB {} {
+    my setWaitDialog
+    my parseCommandLineArgs
+    my loadPreferences
+    my establishDBConnection
+    my loadIDECoreFromDB
+    my loadExtendedDebugger
+    ::IDE initSystem
+    ::IDE::Component initFromInterpreter
+    ::IDE::CommentsContainer parseAndCleanMeta
+    ::IDE::CommentsContainer makeTclGroupsFromMeta
+    my initProcWrappersStruct
+    ::IDE::DBPersistence setConnection [my set sqlhandle]
+    ::IDE::System initDatabaseNoConnect
+    ::IDE::ComponentPersistence synchronizeCoreSystem
+    my loadConfigMapDevel
+    my preloadComponents
+    my startUpIDE
+    my preexec
+}
+@ IDEStarter proc startIDEOnly {} {
+description {Start Up System without Database loaded per package require}
+}
+IDEStarter proc startIDEOnly {} {
+    my parseCommandLineArgs
+    my loadPreferences
+    my requireBaseComponents
+    IDE initSystem
+    my loadExtendedDebugger
+    ::IDE::Component initFromInterpreter
+    ::IDE::CommentsContainer parseAndCleanMeta
+    ::IDE::CommentsContainer makeTclGroupsFromMeta
+    my loadConfigMapDevel
+    my startUpIDE
+    my preexec
+}
+@ IDEStarter proc startIDEWithDB {} {
+description {Start Up System with Database loaded per package require}
+}
+IDEStarter proc startIDEWithDB {} {
+    my parseCommandLineArgs
+    my loadPreferences
+    my establishDBConnection
+    my requireBaseComponents
+    ::IDE initSystem
+    my loadExtendedDebugger
+    ::IDE::Component initFromInterpreter
+    ::IDE::CommentsContainer parseAndCleanMeta
+    ::IDE::CommentsContainer makeTclGroupsFromMeta
+    ::IDE::DBPersistence setConnection [my set sqlhandle]
+    ::IDE::System initDatabaseNoConnect
+    my loadConfigMapDevel
+    my startUpIDE
+    my preexec
+}
+IDEStarter proc startLoader {} {
+    my parseCommandLineArgs
+    my set isDevelopingMode 0
+    my loadPreferences
+    my establishDBConnection
+    if {![my loadConfigMap]} {
+        puts "you must specify '-configmap ConfigMapFile' parameter"
+        exit
+    }
+}
+IDEStarter proc startMetakit metakithandle {
+    my instvar sqlhandle
+    my setWaitDialog
+    my parseCommandLineArgs
+    set sqlhandle [XOMetakit new]
+    $sqlhandle set handle $metakithandle
+    $sqlhandle set connected 1
+    $sqlhandle set unitOfWork 0
+    my loadPreferences
+    my loadIDECoreFromDB
+    ::IDE initSystem
+    ::IDE::Component initFromInterpreter
+    ::IDE::CommentsContainer parseAndCleanMeta
+    ::IDE::CommentsContainer makeTclGroupsFromMeta
+    my initProcWrappersStruct
+    ::IDE::DBPersistence setConnection [my set sqlhandle]
+    ::IDE::System initDatabaseNoConnect
+    ::IDE::ComponentPersistence synchronizeCoreSystem
+    my loadConfigMapDevel
+    my preloadComponents
+    my startUpIDE
+    my preexec
+}
+IDEStarter proc startUpIDE {} {
+    my closeWaitDialog
+    IDE::CompBrowser newBrowser
+    IDE::Transcript buildMain
+}
+IDEStarter proc tkMessage text {
+    set fwin [focus]
+    set parent .
+    if {$fwin!={}} { set parent [winfo toplevel $fwin] }
+    return [tk_messageBox -title {Message} -message $text -icon warning -type ok -parent $parent]
+}
+IDEStarter initializeAfterLoad
+

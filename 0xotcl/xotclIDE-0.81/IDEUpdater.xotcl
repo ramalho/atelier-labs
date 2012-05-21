@@ -1,0 +1,322 @@
+# automatically generated from XOTclIDE
+# script require component {IDEBaseGUI IDECore}
+package provide IDEUpdater 0.75
+package require IDEBaseGUI
+package require IDECore
+Class ClassUpdateMix
+@ ::ClassUpdateMix idemeta component IDEUpdater
+ClassUpdateMix instproc create args {
+    if {![Object ismetaclass [self]] && [self] ne "::xotcl::Object"} {
+        next
+    } else {
+        set obj [lindex $args 0]
+        if {[Object isobject $obj]} {
+            UpdateManager addWatch $obj
+        } else {
+            # new object use ne component
+            next
+            $obj moveToComponent updateNewObjects
+            UpdateManager addNewObject [$obj]
+        }
+    }
+}
+ClassUpdateMix instproc initializeAfterLoad {} {
+    # ignore this
+}
+ClassUpdateMix instproc instproc {procname arguments body args} {
+    if {[UpdateManager isInWatch [self]]} {
+        if {[llength [my info instprocs $procname]]==0} {
+            UpdateManager addUpdate [list [self] instproc $procname $arguments $body]
+        } else {
+            if {[my info instbody $procname] ne $body} {
+                UpdateManager addUpdate [list [self] instproc $procname $arguments $body]
+            } else {
+                set darguments {}
+                foreach arg [my info instargs $procname] {
+                    if {[my info instdefault $procname $arg val]} {
+                        # add variables (val)
+                        lappend darguments [list $arg $val]
+                    } else {
+                        lappend darguments $arg
+                    }
+                }
+                if {$darguments ne $arguments} {
+                    UpdateManager addUpdate [list [self] instproc $procname $arguments $body]
+                }
+            }
+        }
+    } else {
+        next
+    }
+}
+ClassUpdateMix instproc proc {procname arguments body args} {
+    if {[UpdateManager isInWatch [self]]} {
+        if {[llength [my info procs $procname]]==0} {
+            UpdateManager addUpdate [list [self] proc $procname $arguments $body]
+        } else {
+            if {[my info body $procname] ne $body} {
+                UpdateManager addUpdate [list [self] proc $procname $arguments $body]
+            } else {
+                set darguments {}
+                foreach arg [my info args $procname] {
+                    if {[my info default $procname $arg val]} {
+                        # add variables (val)
+                        lappend darguments [list $arg $val]
+                    } else {
+                        lappend darguments $arg
+                    }
+                }
+                if {$darguments ne $arguments} {
+                    UpdateManager addUpdate [list [self] proc $procname $arguments $body]
+                }
+            }
+        }
+    } else {
+        next
+    }
+}
+Class IDE::UpdateView -superclass {::IDE::Browser ::IDE::GUICommands} -parameter {{atHead 1}}
+@ ::IDE::UpdateView idemeta categories {hiden-actions action init-realease private list-command}
+@ ::IDE::UpdateView idemeta categoriesMethods {acceptAllWSChanges {acceptChange removeFromList readScript} {fillMenuStruct getMenuStruct specificInit} {searchBody stripWhitespaces tempChange updateList getCurrentForItem searchWSChanges} {selectItem selectMethod}}
+@ ::IDE::UpdateView idemeta component IDEUpdater
+IDE::UpdateView instproc acceptAllWSChanges {} {
+    set id 0
+    set accepted [list]
+    foreach item [my @list getList] {
+        set update [my tempChange [my searchBody $item]]\n
+        set current [my getCurrentForItem $item]
+        if {$current eq ""} continue
+        set s_update [my stripWhitespaces $update]
+        set s_current [my stripWhitespaces $current]
+        if {$s_update eq $s_current} {
+            lappend accepted $item
+            namespace eval :: $update
+        }
+        incr id
+    }
+    foreach item $accepted {
+        my @list removeItem $item
+    }
+}
+IDE::UpdateView instproc acceptChange {} {
+    set id [my @list selectedIndex]
+    if {$id ne ""} {
+        set item [my @list selectedItem]
+        set body [my searchBody $item]
+        if {[llength $body]>0} {
+            namespace eval :: [my tempChange $body]
+            my @list removeItemAt $id
+        }
+    }
+}
+IDE::UpdateView instproc fillMenuStruct ms {
+    $ms enablementHandler [self]
+    $ms addCommand {Read updated script} [list [self] readScript]
+}
+IDE::UpdateView instproc getCurrentForItem item {
+    if {[lindex $item 1] eq "instproc"} {
+        if {[llength [[lindex $item 0] info instprocs [lindex $item 2]]]==0} {
+            return
+        }
+        return [::IDE::IntroProxy getBodyInstanceMethod [lindex $item 0] [lindex $item 2]]
+    } else {
+        if {[llength [[lindex $item 0] info procs [lindex $item 2]]]==0} {
+            return
+        }
+        return [::IDE::IntroProxy getBodyClassMethod [lindex $item 0] [lindex $item 2]]
+    }
+}
+IDE::UpdateView instproc getMenuStruct {} {
+    IDE::MenuStruct create [self]::ms Updates 0
+}
+IDE::UpdateView instproc getTitle {} {
+    return "Update Viewer"
+}
+IDE::UpdateView instproc readScript args {
+    set fileName [IDE::Dialog getOpenFile {{{Tcl Files} *.tcl} {{Xotcl Files} *.xotcl} {Workspace *.wrk} {{All files} *}}]
+    if {$fileName ne ""} {
+        UpdateManager readFile $fileName
+        my updateList
+        IDE::System signalComponentsChanged
+        if {[llength [UpdateManager set newObjects]]>0} {
+            IDE::Dialog message "new object:\n[join [UpdateManager set newObjects] \ \n]\nare found and movet to component 'updateNewObjects'"
+        }
+    }
+}
+IDE::UpdateView instproc removeFromList {} {
+    set id [my @list selectedIndex]
+    if {$id ne ""} {
+        my @list removeItemAt $id
+    }
+}
+IDE::UpdateView instproc searchBody item {
+    set method ""
+    foreach u [UpdateManager set updates] {
+        if {$item eq [lrange $u 0 2]} {
+            set method $u
+            break
+        }
+    }
+    return $method
+}
+IDE::UpdateView instproc searchWSChanges {} {
+    set id 0
+    foreach item [my @list getList] {
+        set update [my tempChange [my searchBody $item]]\n
+        set current [my getCurrentForItem $item]
+        if {$current eq ""} {
+            # item is new
+            my @list markItemIndexForeGround $id red
+            incr id
+            continue
+        }
+        set s_update [my stripWhitespaces $update]
+        set s_current [my stripWhitespaces $current]
+        if {$s_update eq $s_current} {
+            my @list markItemIndexForeGround $id blue
+        } else {
+            my @list markItemIndexForeGround $id {}
+        }
+        incr id
+    }
+}
+IDE::UpdateView instproc selectItem item {
+    set updated [my tempChange [my searchBody $item]]
+    my @text setText $updated
+}
+IDE::UpdateView instproc selectMethod item {
+    set method [my searchBody $item]
+    if {$method eq ""} {
+        ::IDE::Dialog message "method $item not found"
+        return
+    }
+    set m [my getCurrentForItem $item]
+    if {$m eq ""} {
+        IDE::Dialog message "the method is new"
+        return
+    }
+    set u [my tempChange $method]
+    ::IDE::ChangesBrowser compareMethods $u $m
+}
+IDE::UpdateView instproc showCurrent {} {
+    set item [my @list selectedItem]
+    if {$item ne ""} {
+        if {[lindex $item 1] eq "instproc"} {
+            ::IDE::MethodBrowser newBrowserList "[lindex $item 0]>[lindex $item 2]" "current edition"
+        } else {
+            ::IDE::MethodBrowser newBrowserList "[lindex $item 0] class>[lindex $item 2]" "current edition"
+
+        }
+    }
+}
+IDE::UpdateView instproc showDiffs {} {
+    set item [my @list selectedItem]
+    if {$item ne ""} {
+        my selectMethod $item
+    }
+}
+IDE::UpdateView instproc specificInit {} {
+    my instvar win
+
+    IDE::SystemConfigMap loadComponentFromAny IDEPersistenceAdd
+
+    message $win.mes -text "This tool can compute the changes in current interpreter to any script. Use menu->Updates->read updated script. It works only on XOTcl code. Unknow object and classes are moved to component 'updateNewObjects'. Blue marked method are ony white space changes. Red marked methods are new. Deleted methods can not be recognized" -width 700
+    panedwindow $win.panedwindow -orient vertical
+    ::IDE::NListView create [self]::@list $win.nlist -notify [self] -doubleNotifyProc selectMethod
+    ::IDE::Editor create [self]::@text $win.text
+    frame $win.but
+    button $win.but.accept -text "Accept Change" -command [list [self] acceptChange]
+    button $win.but.remove -text "Remove from List" -command [list [self] removeFromList]
+    button $win.but.show -text "Show current edition" -command [list [self] showCurrent]
+    button $win.but.diff -text "Show diffs" -command [list [self] showDiffs]
+    pack $win.but.accept $win.but.remove $win.but.show $win.but.diff -side left
+
+    $win.panedwindow add $win.nlist -sticky news -height 130
+    $win.panedwindow add $win.text -sticky news -height 250
+
+    pack $win.mes -fill x -anchor w
+    pack $win.panedwindow -expand yes -fill both
+    pack $win.but -fill x
+    my updateList
+    next
+}
+IDE::UpdateView instproc stripWhitespaces body {
+    regsub -all {\t} $body  { } body
+    regsub -all { +} $body  { } body
+    regsub -all -line { +$} $body {} body
+    return $body
+}
+IDE::UpdateView instproc tempChange body {
+    # remove namespace :: marker
+    lreplace $body 0 0 [string trimleft [lindex $body 0] :]
+}
+IDE::UpdateView instproc updateList {} {
+    if {![UpdateManager exists updates]} return
+    set list [list]
+    foreach e [UpdateManager set updates] {
+        lappend list [lrange $e 0 2]
+    }
+    my @list setListUnsorted $list
+    my searchWSChanges
+}
+IDE::UpdateView proc newBrowser {} {
+    my new [Object autoname .ubrowser]
+}
+Object UpdateManager
+@ ::UpdateManager idemeta component IDEUpdater
+UpdateManager proc addNewObject obj {
+    my lappend newObjects $obj
+}
+UpdateManager proc addUpdate body {
+    my lappend updates $body
+}
+UpdateManager proc addWatch class {
+    my lappend classes [$class]
+    set desc [$class getDescription]
+    if {$desc ne ""} {
+        $desc trackingOff
+    }
+}
+UpdateManager proc isInWatch class {
+    my instvar classes
+    expr {[info exists classes] && [lsearch $classes $class]>=0}
+}
+UpdateManager proc readFile file {
+    my startWatch
+    namespace eval :: source $file
+    my stopWatch
+    self
+}
+UpdateManager proc show {} {
+    set ret ""
+    foreach u [my set updates] {
+        append ret $u \n
+    }
+    return $ret
+}
+UpdateManager proc startWatch {} {
+    my set classes ""
+    my set updates ""
+    my set newObjects ""
+    Class instmixin add ::ClassUpdateMix
+    namespace eval :: {
+        rename package packageOld
+        proc package args {
+            # ignore
+        }
+    }
+}
+UpdateManager proc stopWatch {} {
+    ::xotcl::Class instmixin delete ::ClassUpdateMix
+    namespace eval :: {
+        rename package {}
+        rename packageOld package
+    }
+    foreach c [my set classes] {
+        set desc [$c getDescription]
+        if {$desc ne ""} {
+            $desc trackingOn
+        }
+    }
+}
+

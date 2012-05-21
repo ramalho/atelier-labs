@@ -1,0 +1,88 @@
+<html>
+
+<script src="color.js"></script>
+
+<script>
+var selecionada = Color.FromString('black');
+
+function faixaClick(evt){
+	var letraCor=evt.target.id.charAt(0);
+	var valor=evt.target.id.substr(1);
+	selecionada[letraCor] = valor
+	
+	var amostra=document.getElementById('amostra_'+letraCor);
+	amostra.style.backgroundColor=evt.target.style.backgroundColor;
+	
+    var mistura=document.getElementById('mistura');
+    mistura.style.backgroundColor=selecionada.toString();
+
+    var saida=document.getElementById('saida');
+    saida.innerHTML=selecionada.toString();
+    atualizarCombinacoes();
+}
+
+function degrade(cor){
+    var slider=document.getElementById('slider_'+cor);
+    for(var i=0; i<256; i++){
+        var faixa=document.createElement('div');
+        if      (cor=='r'){faixa.style.backgroundColor="rgb("+i+",0,0)"}
+        else if (cor=='g'){faixa.style.backgroundColor="rgb(0,"+i+",0)"}
+        else if (cor=='b'){faixa.style.backgroundColor="rgb(0,0,"+i+")"};
+        faixa.style.height="1px";
+        faixa.id=cor+i;
+        faixa.onclick=faixaClick
+        slider.appendChild(faixa)
+    }   
+}
+	
+function montarCombinacoes() {
+	var combinacoes = document.getElementById('combinacoes')
+    for(var i=0; i<9; i++){
+        var combinacao=document.createElement('div');
+        var v = i * 25;
+        combinacao.style.backgroundColor="rgb("+v+","+v+","+v+")"
+        combinacao.style.height="50px";
+        combinacao.id='combinacao'+i;
+        // combinacao.onclick=combinacaoClick
+        combinacoes.appendChild(combinacao)
+    }   
+
+}	
+
+function atualizarCombinacoes() {
+	var cores = selecionada.match()
+    for(var i in cores){
+        var combinacao=document.getElementById('combinacao'+i);
+        combinacao.style.backgroundColor=cores[i].toString();
+    }   
+}	
+
+	
+function init(){
+	degrade("r");
+	degrade("g");
+	degrade("b");
+	montarCombinacoes();
+}
+</script>
+
+
+<body bgcolor="#777777" onload="init()">
+<div id="slider_r" style="position:absolute; top:10px; left:10px; width:80px; height:256px;">  </div>
+<div id="amostra_r" style="position:absolute; top:276px; left:10px; width:80px; height:80px;
+	background-color:#000000;">  </div>
+<div id="slider_g" style="position:absolute; top:10px; left:100px; width:80px; height:256px;">  </div>
+<div id="amostra_g" style="position:absolute; top:276px; left:100px; width:80px; height:80px;
+	background-color:#000000;">  </div>
+<div id="slider_b" style="position:absolute; top:10px; left:190px; width:80px; height:256px;">  </div>
+<div id="amostra_b" style="position:absolute; top:276px; left:190px; width:80px; height:80px;
+	background-color:#000000;">  </div>
+
+<div id="mistura" style="position:absolute; top:10px; left:280px; width:450px; height:450px; background-color:#000000;"> </div>
+
+<div id="combinacoes" style="position:absolute; top:10px; left:740px; width:50px; height:450px; background-color:#333333;"> </div>
+
+<div id="saida" style="position:absolute; top:366px; left:10px; width:260px; height:30px; background-color:#ffffff;"> </div>
+
+</body>
+</html>

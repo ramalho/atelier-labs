@@ -1,0 +1,677 @@
+# automatically generated from XOTclIDE
+# script require component {IDEView IDEBaseGUI IDECore}
+@ Component IDEPersistenceGUI {
+description {GUI extensions for Version Control
+The classes have the same name as in the IDEView component plus DB appendix
+(for example IDE::ClassViewDB). This extend IDE::ClassView with version control menu
+and functionality
+
+It provide also browser to see code from version control system without
+need to load it.
+1. Version Chooser
+2. Version Browser
+It also expand the standard browser object with version control
+functions (IDE::ClassViewDB)
+}
+}
+package provide IDEPersistenceGUI 0.81
+package require IDEBaseGUI
+package require IDECore
+package require IDEView
+Class IDE::AvailableView -superclass ::IDE::ListView
+@ ::IDE::AvailableView idemeta component IDEPersistenceGUI
+IDE::AvailableView instproc selectItem item {
+    set parent [my info parent]
+    ${parent}::version selectFor $item
+    ${parent}::version setSelectedIndex 0
+    ${parent} set name $item
+}
+Class IDE::ClassViewDB -superclass ::IDE::ClassView
+@ ::IDE::ClassViewDB idemeta component IDEPersistenceGUI
+IDE::ClassViewDB instproc browseChanges dobj {
+    set actual [$dobj getObjectName]
+    set obj2id [IDE::VersionChooser getVersion IDE::ObjectDescription $actual]
+    if {$obj2id eq ""} return
+    if {$obj2id==[$dobj set objectid]} {
+        IDE::Dialog message "Choosen Edition $obj2id of $actual is the same with actual loaded"
+        return
+    }
+    # !! IDE::ProcsGroup do not have interface for direct methodArray asking
+    # so we build here an proxy IDE::ObjectEdition
+    if {[$dobj istype IDE::ProcsGroup]} {
+        set dobj [IDE::ObjectEdition new $actual [$dobj set objectid] -type ProcsGroup]
+    }
+    IDE::ChangesBrowser compareObjects $dobj [IDE::ObjectEdition new $actual $obj2id]
+}
+IDE::ClassViewDB instproc createNewEdition desc {
+    if {[$desc isclosed]} {
+        $desc createNewEdition
+    } else {
+        IDE::Dialog message "[$desc getObjectName] in not versioned."
+    }
+}
+IDE::ClassViewDB instproc dispatchWithSelectedCheck procName {
+    my instvar vclass
+    set actual [my selectedItem]
+    if {$actual ne "" && [set desc [$vclass getDescription]] ne "" &&
+    [$vclass isPersistent]} {
+        my $procName $desc
+    } else {
+        my upsMessage {Select one class/proc group in version control for this action}
+    }
+}
+IDE::ClassViewDB instproc isSelectionEdition {} {
+    expr {![my isSelectionVersion]}
+}
+IDE::ClassViewDB instproc isSelectionPersistent {} {
+    expr {[set desc [[my set vclass] getDescription]] ne "" && [$desc isPersistent]}
+}
+IDE::ClassViewDB instproc isSelectionVersion {} {
+    expr {[[[my set vclass] getDescription] isclosed]}
+}
+IDE::ClassViewDB instproc loadEdition desc {
+    my instvar cobj
+    IDE::VersionBrowser [Object autoname vbrowser] [Object autoname .vbrowser] -vobject IDE::ObjectDescription -type version -name [$desc getObjectName] -componentObject $cobj
+}
+IDE::ClassViewDB instproc loadFromDB {} {
+    my instvar cobj
+    IDE::VersionBrowser  [Object autoname vbrowser] [Object autoname .vbrowser] -vobject IDE::ObjectDescription -type available -componentObject $cobj
+}
+IDE::ClassViewDB instproc loadPrevious desc {
+    $desc loadPrevious
+}
+IDE::ClassViewDB instproc menuInsertions aMenuStruct {
+    $aMenuStruct addSeparator
+
+    set m ${aMenuStruct}::vcontrol
+    IDE::MenuStruct $m {Version Control} -popdownMenu 1
+    $aMenuStruct addCascadeMenu $m
+    $m enablementHandler [self]
+
+    $m addCommand Available [list [self] loadFromDB]
+    $m addMenuItem [IDE::MenuCommand new -childof $m -name Editions -command [list [self] dispatchWithSelectedCheck loadEdition] -enableList [list isValidSelection isSelectionPersistent]]
+    $m addMenuItem [IDE::MenuCommand new -childof $m -name Changes -command [list [self] dispatchWithSelectedCheck browseChanges] -enableList [list isValidSelection isSelectionPersistent]]
+    $m addMenuItem [IDE::MenuCommand new -childof $m -name Version -command [list [self] dispatchWithSelectedCheck versionEdition] -enableList [list isValidSelection isSelectionPersistent isSelectionEdition]]
+    $m addMenuItem [IDE::MenuCommand new -childof $m -name {New Edition} -command [list [self] dispatchWithSelectedCheck createNewEdition] -enableList [list isValidSelection isSelectionPersistent isSelectionVersion]]
+    $m addMenuItem [IDE::MenuCommand new -childof $m -name {Reload Edition} -command [list [self] dispatchWithSelectedCheck reloadEdition] -enableList [list isValidSelection isSelectionPersistent isSelectionEdition]]
+    $m addMenuItem [IDE::MenuCommand new -childof $m -name {Load Previous} -command [list [self] dispatchWithSelectedCheck loadPrevious] -enableList [list isValidSelection isSelectionPersistent]]
+    $m addMenuItem [IDE::MenuCommand new -childof $m -name {Version Tree} -command [list [self] dispatchWithSelectedCheck showVersionTree] -enableList [list isValidSelection isSelectionPersistent]]
+    $m addMenuItem [IDE::MenuCommand new -childof $m -name Info -command [list [self] dispatchWithSelectedCheck versionInfo] -enableList [list isValidSelection isSelectionPersistent]]
+}
+IDE::ClassViewDB instproc reloadEdition desc {
+    $desc reloadEdition
+}
+IDE::ClassViewDB instproc selectItem object {
+    next
+    my instvar vclass
+    if {$object eq ""} return
+    set desc [$vclass getDescription] 
+    if {$desc ne "" && [$desc isPersistent]} {
+        [my info parent] setStatusBarText [$desc printString]
+    } else {
+        [my info parent] setStatusBarText "$object (object not in DB)"
+    }
+}
+@ IDE::ClassViewDB instproc setList {} {
+description {This method is responsed to color the items dependend from version control status}
+}
+IDE::ClassViewDB instproc setList objs {
+    my instvar cobj vtype treeView
+    if {![$cobj isPersistent]} {
+        next
+        return
+    } else {
+        if {$treeView} {
+            set sobjs $objs
+        } else {
+            set sobjs [lsort $objs]
+        }
+        my setListUnsorted $sobjs
+        if {![$cobj isclosed]} {
+            set index 0
+            foreach obj $sobjs {
+                set obj [string trim $obj]
+                if {$vtype eq "Procs"} {
+                    set desc [$cobj getProcsGroupWithName $obj]
+                } else {
+                    set desc [$obj getDescription]
+                }
+                if {![$desc isclosed]} {
+                    my markItemIndexForeGround $index blue
+                }
+                incr index
+            }
+        }
+    }
+}
+IDE::ClassViewDB instproc showVersionTree desc {
+    IDE::VersionTreeView showVersionTreeObject [$desc getObjectName]
+}
+IDE::ClassViewDB instproc versionEdition desc {
+    $desc versionEdition
+}
+IDE::ClassViewDB instproc versionInfo desc {
+    IDE::VersionInfoView showVersionInfo $desc
+}
+Class IDE::CompRequiredView
+@ ::IDE::CompRequiredView idemeta component IDEPersistenceGUI
+IDE::CompRequiredView proc showRequirements component {
+    set required [$component getRequiredFrom]
+    set listchooser [IDE::IDialogListChooser new -volatile -message "Requirements for [$component getName]" -listout $required -listin [IDE::Component getComponentNames]]
+    set ret [$listchooser prompt]
+    if {$ret ne "cancel"} {
+        $component setRequirements [$listchooser set listout]
+    }
+}
+Class IDE::CompViewDB -superclass ::IDE::CompView
+@ ::IDE::CompViewDB idemeta categories user_actions
+@ ::IDE::CompViewDB idemeta categoriesMethods {{createNewComponent createNewEdition importToDB loadEdition loadFromDB loadPrevious versionEdition versionInfo viewRequired}}
+@ ::IDE::CompViewDB idemeta component IDEPersistenceGUI
+IDE::CompViewDB instproc changesEdition cobj {
+    set comp2id [IDE::VersionChooser getVersionForComponent [$cobj getName]]
+    if {$comp2id eq ""} return
+    if {$comp2id==[$cobj set componentid]} {
+        IDE::Dialog message "Choosen Edition $comp2id of [$cobj getName] is the same with actual loaded"
+        return
+    }
+    IDE::ChangesBrowser compareComponents $cobj [IDE::ComponentEdition new $comp2id]
+}
+IDE::CompViewDB instproc computeRequired cobj {
+    $cobj computeRequirements
+    IDE::Dialog message "The requirements for \"[$cobj getName]\" was set to:\n[join [$cobj getRequiredFrom] \n]"
+}
+IDE::CompViewDB instproc createNewComponent component {
+    next
+    if {[IDE::Dialog yesNo "Should the component $component be installed in database for versioning system"] eq "yes"} {
+        IDE::ComponentPersistence importComponent $component
+    }
+    IDE::System refreshComponentView $component
+}
+IDE::CompViewDB instproc createNewEdition cobj {
+    if {[$cobj isclosed]} {
+        $cobj createNewEdition
+    } else {
+        IDE::Dialog message "[$cobj getName] in not versioned."
+    }
+}
+IDE::CompViewDB instproc dispatchCompObj procName {
+    set actual [my selectedItem]
+    if {$actual eq ""} {
+        my upsMessage {select one component in vc for this action}
+        return 
+    }
+    set cobj [IDE::Component getCompObjectForNameIfExist $actual] 
+    if {$cobj eq "" || ![$cobj isPersistent]} {
+        my upsMessage {selected component is not in version control}
+        return
+    }
+    my $procName $cobj
+}
+IDE::CompViewDB instproc importToDB actual {
+    set cobj [IDE::Component getCompObjectForName $actual]
+    if {![$cobj isPersistent]} {
+        IDE::ComponentPersistence importComponent $actual
+        IDE::System refreshComponentView $actual
+    }
+}
+IDE::CompViewDB instproc isSelectedEdition {} {
+    set cobj [IDE::Component getCompObjectForNameIfExist [my set vcomponent]] 
+    expr {$cobj ne "" && [$cobj isPersistent] && ![$cobj set isclosed]} 
+}
+IDE::CompViewDB instproc isSelectedNotPersistent {} {
+    set cobj [IDE::Component getCompObjectForNameIfExist [my set vcomponent]] 
+    expr {$cobj eq "" || ![$cobj isPersistent]}
+}
+IDE::CompViewDB instproc isSelectedPersistent {} {
+    set cobj [IDE::Component getCompObjectForNameIfExist [my set vcomponent]] 
+    expr {$cobj ne "" && [$cobj isPersistent]}
+}
+IDE::CompViewDB instproc isSelectedVersion {} {
+    expr {![my isSelectedEdition]}
+}
+IDE::CompViewDB instproc loadEdition cobj {
+    IDE::VersionBrowser [Object autoname vbrowser] [Object autoname .vbrowser] -vobject IDE::ComponentPersistence -type version -name [$cobj getName]
+}
+IDE::CompViewDB instproc loadFromDB {} {
+    IDE::VersionBrowser [Object autoname vbrowser] [Object autoname .vbrowser] -vobject IDE::ComponentPersistence -type available
+}
+IDE::CompViewDB instproc loadPrevious cobj {
+    $cobj loadPrevious
+}
+IDE::CompViewDB instproc menuInsertions aMenuStruct {
+    $aMenuStruct addSeparator
+    
+    set m ${aMenuStruct}::vcontrol
+    IDE::MenuStruct $m {Version Control} -popdownMenu 1
+    $aMenuStruct addCascadeMenu $m
+
+    $m addCommand2 Available [list [self] loadFromDB]
+    $m addCommand2 Editions [list [self] dispatchCompObj loadEdition] {isValidSelection isSelectedPersistent}
+    $m addCommand2 Changes [list [self] dispatchCompObj changesEdition] {isValidSelection isSelectedPersistent}
+    $m addCommand2 Version [list [self] dispatchCompObj versionEdition] {isValidSelection isSelectedPersistent isSelectedEdition}
+    $m addCommand2 {New Edition} [list [self] dispatchCompObj createNewEdition] {isValidSelection isSelectedPersistent isSelectedVersion}
+    $m addCommand2 Import [list [self] dispatchWithSelected importToDB] {isValidSelection isSelectedNotPersistent}
+    $m addCommand2  {Reload Edition} [list [self] dispatchCompObj reloadEdition] {isValidSelection isSelectedPersistent isSelectedEdition}
+    $m addCommand2 {Load Previous} [list [self] dispatchCompObj loadPrevious] {isValidSelection isSelectedPersistent}
+    $m addCommand3 {Edit Requirements} [list [self] dispatchCompObj viewRequired] {isValidSelection isSelectedPersistent}
+    $m addCommand3 {Compute Requirements} [list [self] dispatchCompObj computeRequired] {isValidSelection isSelectedPersistent isSelectedEdition}
+    $m addCommand3 {Version Tree} [list [self] dispatchCompObj showVersionTree] {isValidSelection isSelectedPersistent}
+    $m addCommand2 Info [list [self] dispatchCompObj versionInfo] {isValidSelection isSelectedPersistent}
+}
+IDE::CompViewDB instproc refreshComponentView component {
+    set cobj [IDE::Component getCompObjectForNameIfExist $component]
+    set index [lsearch -exact [my getList] $component]
+    if {$cobj ne "" && $index!=-1} {
+        if {[$cobj isPersistent]} {
+            if {![$cobj isclosed]} {
+                set color blue
+            } else {
+                set color default
+            }
+        } else {
+            set color darkgreen
+        }
+        my markItemIndexForeGround $index $color
+    }
+}
+IDE::CompViewDB instproc reloadEdition cobj {
+    $cobj reloadEdition
+}
+IDE::CompViewDB instproc selectItem item {
+    next
+    set cobj [IDE::Component getCompObjectForName $item]
+    if {[$cobj isPersistent]} {
+        [my info parent] setStatusBarText [$cobj printString]
+    } else {
+        [my info parent] setStatusBarText "$item (component not in DB)"
+    }
+}
+IDE::CompViewDB instproc setList comps {
+    set scomps [lsort $comps]
+    my setListUnsorted $scomps
+    set index 0
+    foreach cname $scomps {
+        set cobj [IDE::Component getCompObjectForName $cname]
+        if {[$cobj isPersistent]} {
+            if {![$cobj isclosed]} {
+                my markItemIndexForeGround $index blue
+            }
+        } else {
+            my markItemIndexForeGround $index darkgreen
+        }
+        incr index
+    }
+}
+IDE::CompViewDB instproc showVersionTree cobj {
+    IDE::VersionTreeView showVersionTreeComponent [$cobj getName]
+}
+IDE::CompViewDB instproc versionEdition cobj {
+    $cobj versionEdition
+    IDE::System refreshComponentView [$cobj getName]
+}
+IDE::CompViewDB instproc versionInfo cobj {
+    IDE::VersionInfoView showVersionInfo $cobj
+}
+IDE::CompViewDB instproc viewRequired cobj {
+    IDE::CompRequiredView showRequirements $cobj
+}
+Class IDE::MethodDB
+@ ::IDE::MethodDB idemeta component IDEPersistenceGUI
+IDE::MethodDB instproc browseChanges actual {
+    my instvar vclass vtype
+    set cdesc [$vclass getDescription]
+    if {$cdesc eq ""} return
+    set method [$cdesc get${vtype}Method $actual]
+    set method2id [IDE::VersionChooser getVersion $cdesc $actual]
+    if {$method2id eq ""} return
+    if {$method2id==[$method set methodid]} {
+        IDE::Dialog message "Choosen Edition $method2id of $actual is the same with actual loaded"
+        return
+    }
+    IDE::ChangesBrowser compareMethods [$method getBody] [$cdesc getAdditionalInfo $method2id]
+}
+IDE::MethodDB instproc isSelectionPersistent {} {
+    expr {[[my set vclass] getDescription] ne ""}
+}
+IDE::MethodDB instproc loadEdition actual {
+    my instvar vclass
+    IDE::VersionBrowser [Object autoname vbrowser] [Object autoname .vbrowser] -vobject [$vclass getDescription] -type version -name $actual -componentObject [$vclass getCompObject]
+}
+IDE::MethodDB instproc loadFromDB {} {
+    my instvar vclass
+    IDE::VersionBrowser  [Object autoname vbrowser] [Object autoname .vbrowser] -vobject [$vclass getDescription] -type available -componentObject [$vclass getCompObject]
+}
+IDE::MethodDB instproc loadPrevious method {
+    $method loadPrevious
+    my refreshActual
+}
+IDE::MethodDB instproc menuInsertions aMenuStruct {
+    $aMenuStruct addSeparator
+
+    set m ${aMenuStruct}::vcontrol
+    IDE::MenuStruct $m {Version Control} -popdownMenu 1
+    $aMenuStruct addCascadeMenu $m
+
+    $m addCommand2 Available [list [self] loadFromDB]
+    $m addCommand2 Editions [list [self] dispatchWithSelectedMethod loadEdition] {isValidSelection isSelectionPersistent}
+    $m addCommand2 Changes [list [self] dispatchWithSelectedMethod browseChanges] {isValidSelection isSelectionPersistent}
+    $m addCommand2 {Load Previous} [list [self] dispatchWithMethodDescriptor loadPrevious] {isValidSelection isSelectionPersistent}
+    $m addCommand3 {Version Tree} [list [self] dispatchWithMethodDescriptor showVersionTree] {isValidSelection isSelectionPersistent}
+    $m addCommand2 Info [list [self] dispatchWithMethodDescriptor versionInfo] {isValidSelection isSelectionPersistent}
+}
+IDE::MethodDB instproc showVersionTree method {
+    IDE::VersionTreeView showVersionTreeMethod [$method getName] [$method getObjectName] [$method getType]
+}
+IDE::MethodDB instproc versionInfo method {
+    IDE::VersionInfoView showVersionInfo $method
+}
+Class IDE::MethodListViewDB -superclass {::IDE::MethodListView ::IDE::MethodDB}
+@ ::IDE::MethodListViewDB idemeta component IDEPersistenceGUI
+IDE::MethodListViewDB instproc dispatchWithMethodDescriptor procName {
+    my instvar vclass vtype method
+    set actual $method
+    if {$actual eq ""} return
+    if {[set desc [$vclass getDescription]] eq ""} return
+    if {![$desc isPersistent]} return
+    if {[$desc istype IDE::ProcsGroup]} {
+        set method_desc [$desc getProcObjForNameIfExist $actual]
+    } else {
+        set method_desc [$desc get${vtype}Method $actual]
+    }
+    my $procName $method_desc
+}
+IDE::MethodListViewDB instproc dispatchWithSelectedMethod procName {
+    my $procName [my set method]
+}
+IDE::MethodListViewDB instproc refreshActual {} {
+    my selectClassTypeMethod [my set vclass] [my set vtype] [my set method]
+}
+IDE::MethodListViewDB instproc selectClassTypeMethod {vclass vtype method} {
+    next
+    my set vclass $vclass 
+    my set vtype $vtype
+    my set method $method
+    if {$method eq "" || ![Object isobject $vclass]} return
+    set des [$vclass getDescription]
+    if {$des ne ""} {
+        if {[$des istype IDE::ProcsGroup]} {
+            set mobj [$des getProcObjForNameIfExist $method]
+            if {$mobj ne "" && [$mobj isPersistent]} {
+                [my info parent] setStatusBarText [$mobj printString]
+            }
+        } else {
+            if {$vtype eq "Class"} {
+                set mobj [${vclass}::description getClassMethodObjName $method]
+            } else {
+                set mobj [${vclass}::description getInstanceMethodObjName $method]
+            }
+            if {[Object isobject $mobj]} {
+                [my info parent] setStatusBarText [$mobj printString] 
+            }
+        }
+    }
+}
+Class IDE::MethodViewDB -superclass {::IDE::MethodView ::IDE::MethodDB}
+@ ::IDE::MethodViewDB idemeta component IDEPersistenceGUI
+IDE::MethodViewDB instproc dispatchWithMethodDescriptor procName {
+    my instvar vclass vtype
+    set actual [my selectedItemFirst]
+    if {$actual eq ""} return
+    if {[set desc [$vclass getDescription]] eq ""} return
+    if {![$desc isPersistent]} return
+    if {[$desc istype IDE::ProcsGroup]} {
+        set methodDesc [$desc getProcObjForNameIfExist $actual]
+    } else {
+        set methodDesc [$desc get${vtype}Method $actual]
+    }
+    my $procName $methodDesc
+}
+IDE::MethodViewDB instproc dispatchWithSelectedMethod procName {
+    my dispatchWithSelected $procName
+}
+IDE::MethodViewDB instproc selectItem method {
+    next
+    my instvar vclass vtype
+    if {$method eq "" || ![Object isobject $vclass]} return
+    set des [$vclass getDescription]
+    if {$des ne ""} {
+        if {[$des istype IDE::ProcsGroup]} {
+            set mobj [$des getProcObjForNameIfExist $method]
+            if {$mobj ne "" && [$mobj isPersistent]} {
+                [my info parent] setStatusBarText [$mobj printString]
+            }
+        } else {
+            if {$vtype eq "Class"} {
+                set mobj [${vclass}::description getClassMethodObjName $method]
+            } else {
+                set mobj [${vclass}::description getInstanceMethodObjName $method]
+            }
+            if {[Object isobject $mobj]} {
+                [my info parent] setStatusBarText [$mobj printString] 
+            }
+        }
+    }
+}
+@ Class IDE::VersionBrowser {
+description {GUI to browse editions of Components, Classes/Object and Methods}
+}
+Class IDE::VersionBrowser -superclass ::IDE::Browser -parameter {vobject {type version} {geometry normal} name {componentObject {}}}
+@ ::IDE::VersionBrowser idemeta component IDEPersistenceGUI
+IDE::VersionBrowser instproc destroy {} {
+    my instvar win
+    ::destroy $win
+    next
+}
+IDE::VersionBrowser instproc getActionLabel {} {
+    return Load
+}
+IDE::VersionBrowser instproc loadVersion {} {
+    my instvar vobject name componentObject
+    set versionid [[self]::version getSelectedVersion]
+    if {$versionid ne ""} {
+        $vobject loadNameVersionId $name $versionid $componentObject
+        if {$vobject eq "IDE::ComponentPersistence"} {
+            IDE::System signalComponentsChanged
+        }
+        my destroy
+    }
+}
+IDE::VersionBrowser instproc specificInit {} {
+    my instvar win type geometry vobject name
+
+    if {$type eq "available"} {
+        panedwindow $win.rightarea -orient horizontal
+        panedwindow $win.leftarea -orient vertical
+        IDE::VersionView [self]::version $win.version -multiselect 1
+        IDE::AvailableView [self]::available $win.available
+        [self]::available setListUnsorted [$vobject getAvailable]
+        IDE::Text [self]::additional $win.additional -width 40 -height 10
+    } else {
+        panedwindow $win.leftarea -orient vertical
+        IDE::VersionView [self]::version $win.version -height 6 -multiselect 1
+        IDE::Text [self]::additional $win.additional -width 60 -height 15
+        [self]::version selectFor $name
+        [self]::version setSelectedIndex 0
+    }
+    [[self]::additional getTextWindow] configure -takefocus 0
+
+    frame $win.b
+    # make it objectoriented
+    set actionLabel [my getActionLabel]
+    button $win.b.load -text $actionLabel -command [list [self] loadVersion] -underline 0
+    bind $win <Alt-[string tolower [string index $actionLabel 0]]> [list [self] loadVersion]
+    pack $win.b.load -side left
+    if {![my istype IDE::VersionChooser]} {
+        button $win.b.view -text View -command [list [self] viewEdition]
+        button $win.b.changes -text Changes -command [list [self] viewChanges]
+        pack $win.b.view $win.b.changes -side left
+    }
+    button $win.b.cancel -text Cancel -command [list [self] destroy] -underline 0
+    pack $win.b.cancel -side left
+
+    if {$type eq "available"} {
+        $win.leftarea add $win.version $win.additional
+        $win.rightarea add $win.available $win.leftarea
+        pack $win.rightarea -expand yes -fill both
+    } else {
+        $win.leftarea add $win.version $win.additional
+        pack $win.leftarea -expand yes -fill both
+    }
+    pack $win.b -fill x -anchor w
+    set cancelscript "
+    $win.b.cancel configure -state active -relief sunken
+    update idletasks
+    after 100
+    [self] destroy"
+
+    bind $win <Escape> $cancelscript
+    bind $win <Alt-c> $cancelscript
+
+    next
+}
+IDE::VersionBrowser instproc viewChanges {} {
+    my instvar vobject name
+    set versionids [[self]::version getTwoSelectedVersion]
+    if {$versionids ne ""} {
+        if {$vobject eq "IDE::ComponentPersistence"} {
+            IDE::ChangesBrowser compareComponents [IDE::ComponentEdition new [lindex $versionids 0]] [IDE::ComponentEdition new [lindex $versionids 1]]
+        } elseif {$vobject eq "IDE::ObjectDescription"} {
+            IDE::ChangesBrowser compareObjects [IDE::ObjectEdition new $name [lindex $versionids 0] -type Object] [IDE::ObjectEdition new $name [lindex $versionids 1] -type Object]
+        } elseif {$vobject eq "IDE::ClassDescription"} {
+            IDE::ChangesBrowser compareObjects [IDE::ObjectEdition new $name [lindex $versionids 0] -type Class] [IDE::ObjectEdition new $name [lindex $versionids 1] -type Class]
+        } else {
+            IDE::ChangesBrowser compareMethods [$vobject getAdditionalInfo [lindex $versionids 0]] [$vobject getAdditionalInfo [lindex $versionids 1]]
+        }
+    }
+}
+IDE::VersionBrowser instproc viewEdition {} {
+    my instvar vobject name
+    set versionid [[self]::version getSelectedVersion]
+    if {$versionid ne ""} {
+        if {$vobject eq "IDE::ComponentPersistence"} {
+            IDE::EditionBrowser browseComponentEdition [IDE::ComponentEdition new $versionid]
+        } else {
+            IDE::EditionBrowser browseObjectEdition [IDE::ObjectEdition new $name $versionid]
+        }
+    }
+}
+IDE::VersionBrowser proc newBrowser {} {
+    return [my new [Object autoname .versionbrowser]]
+}
+@ Class IDE::VersionChooser {
+description {GUI to ask user for specific version of one ide element (Component, Class/Object, Method)}
+}
+Class IDE::VersionChooser -superclass {::IDE::DialogHelper ::IDE::VersionBrowser}
+@ ::IDE::VersionChooser idemeta component IDEPersistenceGUI
+IDE::VersionChooser instproc closeWindow {} {
+}
+IDE::VersionChooser instproc getActionLabel {} {
+    return Ok
+}
+IDE::VersionChooser instproc getTitle {} {
+    my instvar name vobject
+    return "Choose version for [$vobject typeName] $name"
+}
+IDE::VersionChooser instproc loadVersion {} {
+    my set result [[self]::version getSelectedVersion]
+    my signalFree
+}
+IDE::VersionChooser proc getVersion {object name} {
+    set instance [my new [Object autoname .vchooser] [list -volatile] [list -vobject $object] [list -type version] [list -name $name]]
+    $instance suspendUntilSignal
+    set ret [$instance getResult]
+    return $ret
+}
+IDE::VersionChooser proc getVersionForComponent name {
+    set instance [my new [Object autoname .vchooser] -volatile -vobject IDE::ComponentPersistence -type version -name $name]
+    $instance suspendUntilSignal
+    set ret [$instance getResult]
+    return $ret
+}
+IDE::VersionChooser proc unknown args {
+    error "unknown method on [self] $args"
+}
+Class IDE::VersionInfoView
+@ ::IDE::VersionInfoView idemeta component IDEPersistenceGUI
+IDE::VersionInfoView proc showVersionInfo object {
+
+    set message "Version Info\n[$object getName]\ntimestamp=[$object set timestamp]\nId=[$object getIdValue]"
+    if {[$object exists basedon] && [$object set basedon] ne "" && [$object set basedon]!=0} {
+        append message "\nbased on [$object set basedon]"
+    }
+    if {[$object exists userid] && [$object set userid] ne ""} {
+        append message "\nuserid=[$object set userid]"
+    }
+
+    if {[$object exists isclosed] && [$object set isclosed]==1} {
+        append message "\n versioned"
+    }
+    if {[$object exists versioninfo]} {
+        set versioninfo [$object set versioninfo]
+    } else {
+        set versioninfo {}
+    }
+    set ret [IDE::IDialogEntry getValue $message $versioninfo]
+    if {$ret ne "" && $ret!=$versioninfo} {
+        $object setVersionInfo $ret
+    }
+}
+Class IDE::VersionView -superclass ::IDE::ListView
+@ ::IDE::VersionView idemeta add desciption
+@ ::IDE::VersionView idemeta component IDEPersistenceGUI
+@ ::IDE::VersionView idemeta desciption IDEPersistenceGUI
+IDE::VersionView instproc getSelectedVersion {} {
+    my instvar idList
+    set index [my selectedIndex]
+    if {[llength $index]!=1} {
+        IDE::Dialog error "You must select one item for this action"
+        return
+    }
+    if {$index eq ""} return
+    return [lindex $idList $index]
+}
+IDE::VersionView instproc getTwoSelectedVersion {} {
+    my instvar idList
+    set index [my selectedIndex]
+    if {[llength $index]!=2} {
+        IDE::Dialog error "You must select two item for this action"
+        return
+    }
+    return [list [lindex $idList [lindex $index 0]] [lindex $idList [lindex $index 1]]]
+}
+IDE::VersionView instproc getVObject {} {
+    return [[my info parent] set vobject]
+}
+IDE::VersionView instproc selectFor name {
+    my instvar idList
+    set vobject [my getVObject]
+    set vlist {}
+    set idList {}
+    set loadedId [$vobject getLoadedVersionForName $name]
+    set markItem {}
+    foreach row [$vobject getVersionsForName $name] {
+        lappend idList [lindex $row 0]
+        set listItem [join [lrange $row 1 end] -]
+        if {$loadedId==[lindex $row 0]} {
+            set markItem $listItem
+        }
+        lappend vlist $listItem
+    }
+    my setListUnsorted $vlist
+    my unselect
+    if {$markItem ne ""} {
+        my markItem $markItem
+    }
+}
+IDE::VersionView instproc selectItem item {
+    my instvar idList
+    set index [lindex [my selectedIndex] 0]
+    if {$index eq ""} return
+    set id [lindex $idList $index]
+    [my info parent]::additional setText [[my getVObject] getAdditionalInfo $id]
+}
+IDE::VersionView proc initializeAfterLoad {} {
+    my set desciption IDEPersistenceGUI
+}
+IDE::VersionView initializeAfterLoad
+

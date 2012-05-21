@@ -1,0 +1,24 @@
+# automatically generated from XOTclIDE
+# script require component xdobry::odbc
+@ Component xdobry::mssql {
+description {This ms-sql (Microsoft SQL Server) adapter is based on odbc (tclodbc)
+and offer some special MSSql adaptation
+1. auto values
+2. NOW() is by MSSql GETDATE()
+3. MSSql specific connection parameter. Do not need odbc source}
+}
+package provide xdobry::mssql 0.61
+package require xdobry::odbc
+Class ODBCMSSql -superclass ::ODBC  -parameter {{interface MSSql}}
+@ ::ODBCMSSql idemeta component xdobry::mssql
+ODBCMSSql instproc getTimeStampFunction {} {
+    return "GETDATE()"
+}
+ODBCMSSql instproc getinsertid {} {
+    lindex [lindex [my queryList {select @@IDENTITY}] 0] 0
+}
+ODBCMSSql instproc insertRowAutoId {table columns values {primarykey {}} {sequenzer {}}} {
+    my insertRow $table $columns $values
+    my getinsertid
+}
+

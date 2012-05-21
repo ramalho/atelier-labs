@@ -1,0 +1,55 @@
+# automatically generated from XOTclIDE
+@ Component xdobry::sqlDebug {
+description {This component serve a small protokol view of
+sended sql commands to xdobry::sql interfaces
+It use xotcl class mixin technique
+
+As view will be IDE::ProtView class used.
+
+To invoke debugger use command
+
+SqlDebugger debug}
+}
+package provide xdobry::sqlDebug 0.35
+Class SqlInterfaceWrapper
+@ ::SqlInterfaceWrapper idemeta component xdobry::sqlDebug
+SqlInterfaceWrapper instproc execute text {
+    SqlDebugger applyProtokoll $text
+    next
+}
+SqlInterfaceWrapper instproc query text {
+    SqlDebugger applyProtokoll $text
+    next
+}
+SqlInterfaceWrapper instproc queryList text {
+    SqlDebugger applyProtokoll $text
+    next
+}
+SqlInterfaceWrapper proc create args {
+  error "[self] is abstract class"
+}
+Object SqlDebugger
+@ ::SqlDebugger idemeta component xdobry::sqlDebug
+SqlDebugger proc activate {} {
+  Sqlinterface instmixin SqlInterfaceWrapper
+}
+SqlDebugger proc applyProtokoll text {
+   my instvar protBrowser
+   if {[Object isobject $protBrowser]} {
+       $protBrowser append $text
+   }
+}
+SqlDebugger proc buildWindow {} {
+  my instvar protBrowser
+  set protBrowser [IDE::ProtBrowser newBrowser]
+}
+SqlDebugger proc deactivate {} {
+  Sqlinterface instmixin {}
+}
+SqlDebugger proc debug {} {
+    if {![winfo exist .sqlmonitor]} {
+        my buildWindow
+        my activate
+    }
+}
+

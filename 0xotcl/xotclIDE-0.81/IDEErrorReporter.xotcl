@@ -1,0 +1,108 @@
+# automatically generated from XOTclIDE
+@ Component IDEErrorReporter {
+description {This a tool can produce an XML file from a Tcl error message.
+It is independent from other XOTclIDE Components.
+
+So it can be used separatly in all XOTcl programms}
+}
+package provide IDEErrorReporter 0.74
+Class ErrorReporter
+@ ::ErrorReporter idemeta categories {private initializing-finalizing}
+@ ::ErrorReporter idemeta categoriesMethods {maskString {destroy init}}
+@ ::ErrorReporter idemeta categoriesMethodsProcs report
+@ ::ErrorReporter idemeta categoriesProcs interface
+@ ::ErrorReporter idemeta component IDEErrorReporter
+ErrorReporter instproc destroy {} {
+    my instvar win
+    ::destroy $win
+    next
+}
+ErrorReporter instproc generateReport {} {
+   my instvar win errorMsg userName
+   set file [tk_getSaveFile -initialfile errorReport.xml]
+   if {$file eq ""} return
+   set of [open $file w]
+   puts $of {<?xml version='1.0' encoding='iso-8859-1'?>
+<!DOCTYPE xotclideError SYSTEM "xotclideError.dtd">
+<xotclideError>}
+   set name [[self class] getAppName]
+   if {$name ne ""} {
+       puts $of "<application>[my maskString $name]</application>"
+   }
+   set version [[self class] getVersion]
+   if {$version ne ""} {
+       puts $of "<version>[my maskString $version]</version>"
+   }
+   if {$userName ne ""} {
+       puts $of "<user>[my maskString $userName]</user>"
+   }
+   set comments [$win.comment get 1.0 end]
+   set comments [string range $comments 0 [expr {[string length $comments] - 2}]]
+   if {$comments ne ""} {
+       puts $of "<comments>[my maskString $comments]</comments>"
+   }
+   puts $of <errorStack>$errorMsg</errorStack>
+   puts $of {</xotclideError>}
+   close $of
+   ::tk_messageBox -type ok -message "The error report file \"$file\" was succesfull generated. Please send it to mail@xdobry.de"
+   my destroy
+}
+ErrorReporter instproc init text {
+    my instvar win errorMsg
+    set errorMsg $text
+    set win [Object autoname .errorReporter]
+    ::toplevel $win
+    wm withdraw $win
+    wm protocol [winfo toplevel $win] WM_DELETE_WINDOW [list [self] destroy]
+    wm title $win "Error Reporter"
+    ::message $win.msg -text {An Tcl Error has occured in the System. Please enter the comment. Generate a error-report file and send it to
+   mail@xdobry.de.
+Lets the bugs die} -width 250
+    label $win.lcomment -text Comments:
+    text $win.comment -width 60 -height 12
+    frame $win.tf 
+    label $win.tf.text -text {Your Name}
+    my requireNamespace
+    entry $win.tf.user -textvariable [self]::userName
+    pack $win.tf.text $win.tf.user -side left
+    pack $win.msg 
+    pack $win.tf $win.lcomment -anchor w 
+    pack $win.comment -expand yes -fill both -padx 10 -pady 10
+
+    frame $win.bf -border 3 -relief raised
+    button $win.bf.ok -text {Generate Report Filie} -command [list [self] generateReport]
+    button $win.bf.cancel -text Cancel -command [list [self] destroy]
+    pack $win.bf.ok $win.bf.cancel -side left
+    if {[Object isobject IDE::ErrorStack]} {
+        button $win.bf.eb -text {Error Browser} -command [list IDE::ErrorStack newBrowser $errorMsg]
+        pack $win.bf.eb -side left -padx 20
+    }
+
+    pack $win.bf -anchor w -fill x -expand yes
+    wm deiconify $win
+}
+ErrorReporter instproc maskString string {
+     regsub -all & $string {\&amp;} string
+     regsub -all < $string {\&lt;} string
+     regsub -all > $string {\&gt;} string
+     regsub -all \" $string {\&quot;} string
+     return $string
+}
+ErrorReporter proc getAppName {} {
+     # Please init version class varible for your system
+     # ErrorReporter set appName XOTclIDE
+
+     if {[my exists appName]} { return [my set appName]}
+     return
+}
+ErrorReporter proc getVersion {} {
+     # Please init version class varible for your system
+     # ErrorReporter set version 0.12"
+
+     if {[my exists version]} { return [my set version]}
+     return
+}
+ErrorReporter proc report errorInfo {
+     my new $errorInfo
+}
+

@@ -1,0 +1,430 @@
+# automatically generated from XOTclIDE
+# script require component {IDECore IDEBaseGUI}
+@ Component IDESQLBrowser {
+description {SQL Browser is GUI Tool that offer SQL shell to chooses Datebase.
+Additional it shows the tables and columnsnames
+The result can be shown as in tktable widget
+
+IDE::SqlBrowser newBrowser}
+}
+package provide IDESQLBrowser 0.74
+package require IDEBaseGUI
+package require IDECore
+Class IDE::CellWindow -superclass ::IDE::Browser
+@ ::IDE::CellWindow idemeta component IDESQLBrowser
+IDE::CellWindow instproc createSystemMenu {} {
+    # no system menu
+}
+IDE::CellWindow instproc getTitle {} {
+    return {Cell :}
+}
+IDE::CellWindow instproc setResult text {
+    [self]::resulttext setText $text
+}
+IDE::CellWindow instproc specificInit {} {
+    my instvar win
+    IDE::Text [self]::resulttext $win.resulttext [list -height 16] [list -width 60]
+
+    grid $win.resulttext -row 0 -column 0 -sticky news
+    
+    grid columnconfigure $win 0 -weight 1
+    grid rowconfigure $win 0 -weight 1
+    next
+}
+Class IDE::SQLEditor -superclass {::IDE::Editor ::IDE::EditorPopDown}
+@ ::IDE::SQLEditor idemeta component IDESQLBrowser
+IDE::SQLEditor instproc execute {} {
+   [my info parent] runQuerry
+}
+IDE::SQLEditor instproc fillMenuStruct ms {
+    $ms enablementHandler [self]
+ 
+    $ms addMenuItem [::IDE::MenuCommand new -childof $ms -name Execute -command [list [self] execute] -popdownMenu 1 -accelerator Control-e]
+    $ms addCommand {Show Cell in Separate Window} [list [[self] info parent] showCellWindow]
+    $ms addCommand {Refresh Tables} [list [[self] info parent] refreshTables]
+    $ms addSeparator
+    
+    $ms addMenuItem [::IDE::MenuCommand new -childof $ms -name Find/Replace -command [list IDE::FindReplace bindToView [self]] -popdownMenu 1 -accelerator Alt-f]
+
+    $ms addCommand {File Out} [list [self] fileOut]
+    $ms addCommand {File In} [list [self] fileIn]
+    $ms addCommand {File Append} [list [self] fileAppend]
+    my menuInsertions $ms
+}
+IDE::SQLEditor instproc getAllWords {} {
+    set words [list]
+    if {[Object isobject [my info parent]::@tables]} {
+        set words [[my info parent]::@tables getList]
+    }
+    if {[Object isobject [my info parent]::@columns]} {
+        set words [concat $words [[my info parent]::@columns getList]]
+    }
+    return $words
+}
+IDE::SQLEditor instproc init args {
+   next
+   set twin [my getTextWindow]
+   bind $twin <KeyPress-Tab> "[self] tabPress"
+   bind $twin <Control-KeyPress-space> "[self] tabPress"
+}
+IDE::SQLEditor instproc tabPress {} {
+    set twin [my getTextWindow]
+    set insert [$twin index insert]
+    set start [$twin index "$insert - 1 c wordstart"]
+    set res [$twin get $start $insert]
+    if {[regexp {[\w\$]+} $res]} {
+       set pattern ${res}*
+       if {$start eq "1.0"} {
+           set reservedwords [list select update delete insert]
+       } else {
+           set reservedwords [list where from having {group by} {order by}]
+       }
+       set words [lsearch -inline -all [concat $reservedwords [my getAllWords]] $pattern]
+       my invokePopDown $words $pattern
+    } else {
+       my appendToCursor {    }
+    }
+    return -code break 
+}
+Class IDE::SqlBrowser -superclass ::IDE::Browser -parameter {{isApplication 0}}
+@ ::IDE::SqlBrowser idemeta categories {schema-help init-release gui sql-actions}
+@ ::IDE::SqlBrowser idemeta categoriesMethods {{insertElem refreshTables selectItem changeTable} {getTitle specificInit createSystemMenu} {clearTable showAbout changeResultShow} {connectDB executeCommand disconnectDB isConnectedDB runQuerry}}
+@ ::IDE::SqlBrowser idemeta component IDESQLBrowser
+IDE::SqlBrowser instproc addToHistory command {
+    my instvar history historyIndex
+    if {[lindex $history $historyIndex] eq $command} return
+    incr historyIndex
+    set history [linsert $history $historyIndex $command]
+    my setNavigationEnablement
+}
+IDE::SqlBrowser instproc backQuerry {} {
+    my instvar history historyIndex
+    if {$historyIndex>=-1} {
+         set command [lindex $history $historyIndex]
+         incr historyIndex -1
+         [self]::@sqlquerry setText $command
+    }
+    my setNavigationEnablement
+}
+IDE::SqlBrowser instproc browseCell {y x} {
+    if {[Object isobject [self]::@cellWindow]} {
+        my instvar win cellArr
+        if {[info exists cellArr($y,$x)]} {
+            set value $cellArr($y,$x)
+        } else {
+            set value [$win.result.table get $y,$x]
+        }
+        [self]::@cellWindow setTitleAddition "$y,$x"
+        [self]::@cellWindow setResult $value
+    }
+}
+IDE::SqlBrowser instproc changeResultShow {} {
+    my instvar resultshow win
+    if {$resultshow eq "text"} {
+        pack forget $win.result.tableframe
+        pack $win.result.sqlresult -expand yes -fill both
+    } else {
+        pack forget $win.result.sqlresult
+        pack $win.result.tableframe -expand yes -fill both
+    }
+}
+IDE::SqlBrowser instproc changeTable table {
+   my instvar dbConnection win
+   if {[$dbConnection info methods getColumns] ne ""} {
+       [self]::@columns setListUnsorted [$dbConnection getColumns $table]
+   }
+}
+IDE::SqlBrowser instproc clearTable {} {
+    my instvar win
+    $win.result.table configure -rows 0 -cols 0
+    $win.result.table configure -titlerows 0
+}
+IDE::SqlBrowser instproc closeWindow {} {
+    if {[my isApplication]} {
+        if {[IDE::Dialog yesNo "Do you want to exit application?"]} {
+            exit
+        }
+    } else {
+        next
+    }
+}
+IDE::SqlBrowser instproc connectDB {} {
+    my instvar dbConnection win
+    my disconnectDB
+    set dbConnection [IDEDBConnectDialog setConnectionOn {}]
+    if {[my isConnectedDB]} {
+        $win.connectionlab configure -text "connected [$dbConnection set interface] - [$dbConnection set dbank]"
+        my refreshTables
+        $win.run configure -state normal
+    }
+}
+IDE::SqlBrowser instproc createSystemMenu {} {
+    if {![my isApplication]} {
+        next 
+    } else {
+        my instvar win
+        global tcl_platform
+        set ms [IDE::MenuStruct new Help 0]
+        $ms addCommand {About} [list [self] showAbout]
+        if {$tcl_platform(platform) eq "windows"} {
+            $ms addCommand {Show Tcl Console} [list console show]
+        }
+        if {[winfo toplevel $win] eq "."} {
+            set twin {}
+        } else {
+            set twin $win
+        }
+        $ms createTkMenu $twin.mb.idesystem $twin
+        $twin.mb add cascade -label [$ms set name] -menu $twin.mb.idesystem -underline 0
+
+        [winfo toplevel $win] configure -menu $twin.mb
+    }
+}
+IDE::SqlBrowser instproc disconnectDB {} {
+   my instvar dbConnection win
+   if {[info exists dbConnection] && $dbConnection ne ""} {
+        $dbConnection destroy
+        set dbConnection ""
+        $win.run configure -state disabled
+        my clearTable
+   }
+   catch {
+        $win.connectionlab configure -text "disconnected"
+        [self]::@tables setList {}
+        [self]::@columns setList {}
+   }
+}
+IDE::SqlBrowser instproc executeCommand command {
+    my instvar dbConnection win
+    set result [$dbConnection execute $command]
+    my set resultshow text
+    my changeResultShow
+    my clearTable
+    if {$result eq ""} {
+        [self]::@sqlresult setText [$dbConnection errorMessage]
+    } else {
+        [self]::@sqlresult setText "affected rows: $result"
+        my addToHistory $command
+    }
+    
+}
+IDE::SqlBrowser instproc forwardQuerry {} {
+    my instvar history historyIndex
+    if {$historyIndex<[expr {[llength $history]-1}]} {
+         incr historyIndex 1
+         set command [lindex $history $historyIndex]
+         [self]::@sqlquerry setText $command
+    }
+    my setNavigationEnablement
+}
+IDE::SqlBrowser instproc getTitle {} {
+    return "SQL Browser"
+}
+IDE::SqlBrowser instproc insertElem text {
+     [self]::@sqlquerry appendToCursor $text
+}
+IDE::SqlBrowser instproc isConnectedDB {} {
+   my instvar dbConnection
+   expr {[info exists dbConnection] && $dbConnection ne "" && [$dbConnection isConnected]}
+}
+IDE::SqlBrowser instproc refreshTables {} {
+    my instvar dbConnection
+    [self]::@tables setList [$dbConnection getTables]
+}
+IDE::SqlBrowser instproc runQuerry {} {
+    set command [[self]::@sqlquerry getText]
+    if {$command eq ""} return
+    if {![string match -nocase select* [string trim $command]]} {
+        my executeCommand $command
+        return
+    }
+    my instvar dbConnection win cellArr
+    catch {unset cellArr}
+    set query [$dbConnection query $command]
+    if {$query eq ""} {
+        [self]::@sqlresult setText [$dbConnection errorMessage]
+        my clearTable
+        my set resultshow text
+        my changeResultShow
+        return
+    }
+    my addToHistory $command
+    set x 0
+    set cols 0
+    set returnedRows 0
+    set hasLabels 0
+    while 1 {
+        set row [$query fetch]
+        if {$row eq ""} break
+        if {$cols==0} {
+             set cols [llength $row]
+             if {[$query info methods rows] ne ""} {
+                 set rows [$query rows]
+             } else {
+                 set rows 30
+             }
+             if {[$query info methods columnNames] ne ""} {
+                 incr rows
+                 incr x
+                 set hasLabels 1
+                 $win.result.table configure -rows $rows -cols $cols
+                 $win.result.table set row 0,0 [$query columnNames]
+                 $win.result.table configure -titlerows 1
+             } else {
+                 $win.result.table configure -rows $rows -cols $cols
+             }
+        }
+        set rrow [list]
+        set cx 0
+        foreach elem $row {
+            if {[string bytelength $elem]>100} {
+                lappend rrow "<[string bytelength $elem] bytes>"
+                set cellArr($x,$cx) $elem
+            } else {
+                lappend rrow $elem
+            }
+            incr cx
+        }
+        $win.result.table set row $x,0 $rrow
+        incr x
+        incr returnedRows
+        if {$returnedRows>=$rows+$hasLabels} {
+            incr rows 20
+            $win.result.table configure -rows $rows
+        }
+    }
+    if {$returnedRows!=$rows+$hasLabels} {
+         $win.result.table configure -rows [expr {$returnedRows+$hasLabels}]
+    }
+    if {$x==0} {
+       my clearTable
+    }
+    my set resultshow table
+    my changeResultShow
+    [self]::@sqlresult setText "returned rows: $returnedRows"
+    $query destroy
+}
+IDE::SqlBrowser instproc selectItem item {
+  # needed for IDE::NListView
+}
+IDE::SqlBrowser instproc setNavigationEnablement {} {
+    my instvar win historyIndex history
+    if {$historyIndex>=0} {
+        set state normal
+    } else {
+        set state disabled
+    }
+    $win.back configure -state $state
+    if {$historyIndex<[expr {[llength $history]-1}]} {
+        set state normal
+    } else {
+        set state disabled
+    }
+    $win.forward configure -state $state
+}
+IDE::SqlBrowser instproc showAbout {} {
+    IDE::Dialog infoMessage "   Tk SQL Browser 0.3\nThe programm was written by Artur Trzewik and is GPL Licensed\nhomepage http://www.xdobry.de/atksqlbrowser\ncomes with ABSOLUTELY NO WARRANTY See the GNU General Public License for more details. (http://www.gnu.org)\n\nIt was primary developed as plug-in for XOTclIDE"
+}
+IDE::SqlBrowser instproc showCellWindow {} {
+    if {![Object isobject [self]::@cellWindow]} {
+        IDE::CellWindow create [self]::@cellWindow  [Object autoname .sqlcell]
+    }
+}
+IDE::SqlBrowser instproc specificInit {} {
+    my instvar win ignoreKnownComponents resultshow
+    my requireNamespace
+    
+    my set history [list]
+    my set historyIndex -1
+    
+    panedwindow $win.pannedwindow -orient vertical
+    frame $win.connectframe
+    frame $win.schema
+    button $win.connect -command [list [self] connectDB] -text "Connect DB"
+    label $win.connectionlab
+    button $win.disconnect -command [list [self] disconnectDB] -text "Disonnect"
+    IDE::NListView create [self]::@tables $win.schema.tables -height 3 -label Tables -notify [self] -notifyProc changeTable -doubleNotifyProc insertElem
+    IDE::NListView create [self]::@columns $win.schema.columns -height 3 -label Columns -notify [self] -doubleNotifyProc insertElem
+
+    frame $win.editor
+    IDE::SQLEditor create [self]::@sqlquerry $win.sqlquerry -height 1
+    button $win.run -command [list [self] runQuerry] -text "Execute Ctrl-e" -state disabled
+    button $win.back -command [list [self] backQuerry] -text "Back" -state disabled
+    button $win.forward -command [list [self] forwardQuerry] -text "Forward" -state disabled
+    
+    frame $win.result
+    set resultshow text
+    my requireNamespace
+    
+    frame $win.result.rbframe
+    radiobutton $win.result.showtext -text "text" -variable [self]::resultshow -command [list [self] changeResultShow] -value text
+    radiobutton $win.result.showtable -text "table" -variable [self]::resultshow -command [list [self] changeResultShow] -value table
+    pack $win.result.showtext $win.result.showtable -in $win.result.rbframe -side left
+    
+    IDE::Text create [self]::@sqlresult $win.result.sqlresult -height 1
+    frame $win.result.tableframe
+    scrollbar $win.result.ytablescroll -command [list $win.result.table yview]
+    scrollbar $win.result.xtablescroll -command [list $win.result.table xview] -orient horizontal
+    table $win.result.table -yscrollcommand [list $win.result.ytablescroll set] -xscrollcommand [list $win.result.xtablescroll set] -cache yes -height 12 -anchor w -browsecommand [list [self] browseCell %r %c]
+    grid $win.result.table -in $win.result.tableframe -column 0 -row 0 -sticky news
+    grid $win.result.ytablescroll -in $win.result.tableframe -column 1 -row  0 -sticky nws
+    grid $win.result.xtablescroll -in $win.result.tableframe -column 0 -row  1 -sticky nwe
+    grid columnconfig $win.result.tableframe 0 -weight 1
+    grid rowconfig $win.result.tableframe 0 -weight 1
+
+    
+    pack $win.schema.tables $win.schema.columns -side left -expand yes -fill both
+    pack $win.schema -in $win.connectframe -expand yes -fill both -side bottom
+    pack $win.connect $win.disconnect $win.connectionlab -side left -in $win.connectframe
+
+    pack $win.sqlquerry -in $win.editor  -expand yes -fill both
+    pack $win.run -in $win.editor -anchor w -side left
+    pack $win.back -in $win.editor -anchor w -side left
+    pack $win.forward -in $win.editor -anchor w -side left
+    
+    pack $win.result.rbframe -anchor w
+    pack $win.result.sqlresult -expand yes -fill both
+
+    $win.pannedwindow add $win.connectframe  -sticky news -height  110
+    $win.pannedwindow add $win.editor  -sticky news -height  110
+    $win.pannedwindow add $win.result -sticky news -height  180
+    pack $win.pannedwindow -expand yes -fill both
+    next
+}
+IDE::SqlBrowser proc initTkTable {} {
+    if {[info commands table] eq ""} {
+        if {[catch {package require Tktable}]} {
+            return 0
+        }
+    }
+    if {[Object isobject IDE::Component] && [IDE::Component getCompObjectForNameIfExist xdobry::sql] eq ""} {
+        IDEStarter loadComponentFromAny xdobry::sql
+    } else {
+        package require xdobry::sql
+    }
+    return 1
+}
+@ IDE::SqlBrowser proc newBrowser {} {
+description {Start if you use sql browser as stand-alone application in . toplevel window.
+Exit the window will exit the application}
+}
+IDE::SqlBrowser proc newBrowser {} {
+     if {![IDE::System isTkNeverThan84]} {
+       IDE::Dialog error "You need at least Tcl8.4 for use SQL Browser. Upgrade please!"
+       return
+     }
+     if {![my initTkTable]} {
+         IDE::Dialog error "The package Tktable could not be loaded please install it on your tcl system (see http://sourceforge.net/projects/tktable)"
+         
+     } else {
+         my new [Object autoname .sqlbrowser]
+     }
+}
+IDE::SqlBrowser proc startAsApplication {} {
+     my initTkTable
+     frame .f
+     pack .f -fill both -expand yes
+     my create sqlbrowser .f -isApplication 1
+     wm deiconify .
+}
+

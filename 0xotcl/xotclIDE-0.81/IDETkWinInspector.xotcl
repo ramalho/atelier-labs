@@ -1,0 +1,304 @@
+# automatically generated from XOTclIDE
+# script require component {IDEBaseGUI IDECore}
+package provide IDETkWinInspector 0.74
+package require IDEBaseGUI
+package require IDECore
+Class IDE::TkWinConfList -superclass {::IDE::ListView ::IDE::GUICommands}
+@ ::IDE::TkWinConfList idemeta component IDETkWinInspector
+IDE::TkWinConfList instproc editSave value {
+    my instvar vconf vwindow
+    $vwindow configure $vconf $value
+}
+IDE::TkWinConfList instproc fillMenuStruct ms {
+    my requireNamespace
+    my set ignoreDefaults 0
+    $ms addCheckButton {Ingnore defualts by _all} [self]::ignoreDefaults {}
+    next
+}
+IDE::TkWinConfList instproc getMenuStruct {} {
+    return [IDE::MenuStruct [self]::ms Configurations 0]
+}
+IDE::TkWinConfList instproc selectFor window {
+    my instvar vwindow
+    set vwindow $window
+    if {$window eq ""} {
+        my setList {}
+    } else {
+        my setListUnsorted [concat _all [lsort [ide::lcollect each [$window configure] {lindex $each 0}]]]
+        [my info parent] setStatusBarText "$window - [winfo class $window]"
+    }
+    my selectItem {}
+}
+IDE::TkWinConfList instproc selectItem conf {
+    my instvar vconf vwindow ignoreDefaults
+    set vconf $conf
+    if {$vconf eq ""} {
+       set text ""   
+    } elseif {$vconf eq "_all"} {
+       append text "$vwindow configure"
+       foreach conf [$vwindow configure] {
+           # argvName, dbName, dbClass, defValue, and current value
+           if {[llength $conf]<=2} continue
+           if {$ignoreDefaults && [lindex $conf 3]==[lindex $conf 4]} continue
+           append text "\\\n   [lindex $conf 0] [list [lindex $conf 4]]"
+       }
+    } else {
+       set text [$vwindow cget $conf]
+    }
+    [my info parent]::valuetext setTextControler $text [self]
+}
+Class IDE::TkWinInspectorBrowser -superclass ::IDE::Browser
+@ ::IDE::TkWinInspectorBrowser idemeta component IDETkWinInspector
+IDE::TkWinInspectorBrowser instproc getTitle {} {
+    return {Tk Inspector}
+}
+IDE::TkWinInspectorBrowser instproc specificInit {} {
+    my instvar win
+    panedwindow $win.panedwindow -orient vertical
+    panedwindow $win.upperarea -orient horizontal
+    IDE::TkWinList create [self]::winlist $win.upperarea.winlist
+    IDE::TkWinConfList create [self]::conflist $win.upperarea.conflist
+    IDE::MethodEdit create [self]::valuetext $win.valuetext
+    
+    $win.upperarea add $win.upperarea.winlist $win.upperarea.conflist -width 300
+    $win.panedwindow add $win.upperarea -sticky news -height  220
+    $win.panedwindow add $win.valuetext -sticky news -height 200
+    
+    pack $win.panedwindow -fill both -expand yes
+    my initStatusBar 0 2
+    [self]::winlist selectFor .
+}
+IDE::TkWinInspectorBrowser proc newBrowser {} {
+   if {![IDE::System isTkNeverThan84]} {
+       IDE::Dialog error "You need at least Tcl8.4 for use Tk Inspector. Upgrade please!"
+       return
+   }
+   return [my new [Object autoname .tkinspector]]
+}
+Class IDE::TkWinList -superclass {::IDE::ListView ::IDE::GUICommands}
+@ ::IDE::TkWinList idemeta component IDETkWinInspector
+IDE::TkWinList instproc addtags {w tags} {
+    foreach {d tag pos} $tags {
+        if {$d == "tagon"} {
+            set t($tag) $pos
+        } elseif {$d == "tagoff" && [info exists t($tag)] && $t($tag) != ""} {
+            $w tag add $tag $t($tag) $pos
+            unset t($tag)
+        }
+    }
+ }
+IDE::TkWinList instproc buttonDoublePush {} {
+    set item [my selectedItemFirst]
+    if {$item ne ""} {
+        my selectFor $item
+    }
+}
+IDE::TkWinList instproc destroyWidget w {
+    ::destroy $w
+}
+IDE::TkWinList instproc editSave value {
+    # ignore save command from editor
+}
+IDE::TkWinList instproc fillMenuStruct ms {
+    $ms enablementHandler [self]
+    $ms addCommand2 {Serialize Widget} [list [self] dispatchWithSelected serializeWidgetAction] isValidSelection
+    $ms addCommand2 {Destroy Widget} [list [self] dispatchWithSelected destroyWidget] isValidSelection
+    $ms addCommand {Refresh} [list [self] refreshWidgets]
+    next
+}
+IDE::TkWinList instproc getMenuStruct {} {
+    return [IDE::MenuStruct [self]::ms Window 0]
+}
+IDE::TkWinList instproc getconfig {w {cmd configure}} {
+    set args {}
+    foreach x [eval $w $cmd] {
+        if {[set opt [lindex $x 4]] != [lindex $x 3]} {lappend args [list [lindex $x 0] $opt]}
+    }
+    return [join $args]
+}
+IDE::TkWinList instproc init args {
+    next
+    my instvar win
+    button $win.upbutton -text Up -command [list [self] upWindow]
+    pack $win.upbutton -anchor w -side top -before $win.listbox
+}
+IDE::TkWinList instproc packerConfigurationString {win manager root} {
+    set text ""
+    array set defarr {
+        -anchor center
+        -expand 0
+        -fill none
+        -ipadx 0
+        -ipady 0
+        -padx 0
+        -pady 0
+        -side top
+        -columnspan 0
+        -rowspan 0
+        -sticky {}
+        -bordermode inside
+    }
+    if {$manager eq "place"} {
+        set defarr(-anchor) nw
+    }
+    foreach {opt value} [$manager info $win] {
+        if {[info exists defarr($opt)] && $defarr($opt)==$value} continue
+        if {$opt eq "-in"} {
+            if {$value!=[winfo parent $win]} {
+                if {![regsub -all -- $root $value \$win value]} {
+                    return "### gemetry window $value not child of $root"
+                }
+                append text " $opt $value"
+            }
+        } else {
+            append text " $opt $value"
+        }
+    }
+    return $text
+}
+IDE::TkWinList instproc refreshWidgets {} {
+    if {[winfo exists [my set vwindow]]} {
+        my selectFor [my set vwindow]
+    } else {
+        my selectFor .
+    }
+}
+IDE::TkWinList instproc selectFor window {
+    my instvar vwindow
+    if {$window eq ""} {
+        my setList [list .]
+    } else {
+        set children [winfo children $window]
+        if {[llength $children]==0} return
+        my setList $children
+    }
+    set vwindow $window
+    my selectItem {}
+}
+IDE::TkWinList instproc selectItem window {
+    set parent [my info parent]
+    if {[Object isobject ${parent}::conflist]} {
+        ${parent}::conflist selectFor $window
+    }
+    if {[Object isobject ${parent}::valuetext]} {
+        set text {}
+        set sequences {}
+        if { [winfo exists $window] } {
+            set tags [bindtags  $window]
+            append text "BINDTAGS: $tags\n"
+            foreach tag $tags {
+                append text " BINDS ${tag}:\n"
+                set binds [lsort [bind $tag]]
+                set sequences [concat $sequences $binds]
+                foreach bind $binds {
+                    append text "   ${bind}: [bind $tag $bind]\n"
+                }
+            }
+        }
+        ${parent}::valuetext setTextControler $text [self]
+        foreach sequence $sequences {
+            ${parent}::valuetext colorizeTextAll $sequence
+        }
+    }
+}
+IDE::TkWinList instproc serializeMenu {c root} {
+    set end [$c index end]
+    set text ""
+    for {set x 0} {$x <= $end} {incr x} {
+        set state "$c add [$c type $x] [my getconfig $c [list entryconfigure $x]]\n"
+        regsub -all -- $root $state \$win state
+        append text $state
+    }
+    return $text
+}
+IDE::TkWinList instproc serializeWidget {w root} {
+    append state "# serialize $w\n"
+    set new \$win[string range $w [string length $root] end]
+    if {[catch {$w configure -class} widget]} {set widget "{} {} {} [winfo class $w]"}
+    set widget [string tolower [lindex $widget 3]]
+    append state "$widget $new [my widgetConfigurationString $w $root]" \n
+    if {$widget eq "menu"} {
+        append state [my serializeMenu $w $root] \n
+    } 
+    #append state "bindtags $new [list [bindtags $c]]\n"
+    if {[set bindings [bind $w]] != ""} {
+        foreach x $bindings {
+            append state "bind $new $x [list [bind $w $x]]\n"
+        }
+    }
+    foreach c [winfo children $w] {
+        if {[string match *.#* $c]} {continue}
+        append state [my serializeWidget $c $root]
+    }
+    # Search again after pannedwindow
+    foreach c [winfo children $w] {
+        if {[winfo class $c] ne "Panedwindow"} {continue}
+        set newc \$win[string range $c [string length $root] end]
+        foreach x [$c panes] {
+            set news \$win[string range $x [string length $root] end]
+            append state "$newc add $news [my getconfig $c [list paneconfigure $x]]\n"
+        } 
+    }
+    if {$widget eq "panedwindow" && $w==$root} {
+        foreach x [$w panes] {
+            set news \$win[string range $x [string length $root] end]
+            append state "$new add $news [my getconfig $w [list paneconfigure $x]]\n"
+        } 
+    }
+    if {$widget eq "toplevel" && [$w cget -menu] ne ""} {
+        regsub -all -- $root [$w cget -menu] \$win menu
+        append state "$new configure -menu $menu"
+    }
+    set manager [set manager [winfo manager $w]]
+    if {$manager == "grid" || $manager == "pack" || $manager == "place"} {
+        append state "$manager $new [my packerConfigurationString $w $manager $root]\n"
+    }
+    set grid [grid size $w]
+    if {[set cols [lindex $grid 0]] > 0} {
+        for {incr cols -1} {$cols > -1} {incr cols -1} {
+            append state "grid columnconfigure $new $cols [grid columnconfigure $w $cols]\n"
+        }
+    }
+    if {[set rows [lindex $grid 1]] > 0} {
+        for {incr rows -1} {$rows > -1} {incr rows -1} {
+            append state "grid rowconfigure $new $rows [grid rowconfigure $w $rows]\n"
+        }
+    }
+    return $state
+}
+IDE::TkWinList instproc serializeWidgetAction w {
+    if {[winfo class $w] eq "Toplevel"} {
+        append text "set win .test\n\n"
+    } else {
+        append text "set win .test.w\ntoplevel .test\n\n"
+    }
+    append text [my serializeWidget $w $w]
+    if {[winfo class $w] ne "Toplevel"} {
+        append text "pack .test.w"
+    }
+    IDE::ResultBrowser newBrowser $text
+}
+IDE::TkWinList instproc upWindow {} {
+    my instvar vwindow
+    if {$vwindow ne "" && [winfo exists $vwindow]} {
+        my selectFor [winfo parent $vwindow]
+    } else {
+        my selectFor .
+    }
+}
+IDE::TkWinList instproc widgetConfigurationString {w root} {
+    set text ""
+    foreach conf [$w configure] {
+        if {[lindex $conf 3]==[lindex $conf 4]} continue
+        set cname [lindex $conf 0]
+        if {[winfo class $w] eq "Toplevel" && $cname eq "-menu"} continue
+        if {[lsearch [list -command -yscrollcommand -xscrollcommand] $cname]>=0} {
+           regsub -all -- $root [lindex $conf 4] \$win erg
+           append text " $cname \[list $erg\]"
+        } else {
+           append text " $cname [list [lindex $conf 4]]"
+        }
+    }
+    return $text
+}
+

@@ -1,0 +1,394 @@
+# Version 0.81
+* Sat Dec 02 2006 Artur Trzewik
+- ignore slot subobjects by importing component (compatiblity to XOTcl 1.5)
+- some refactoring by IDEBaseGUI component.
+- changing color of componets, which are not under version control from green to darkgreen
+- bug fix: check order of objects after moving object to new component
+- bug fix: by moving proc groups in version controled components
+# Version 0.80
+* Fri Apr 28 2006 Artur Trzewik
+- changes in methods are synchronized in multiple views
+- unsaved context in edit areas are recognized and asked if user set another view
+- refreshing of counting of methods categories are fixed
+- entering proc breakpoints can be set for XOTcl methods and Tcl procs
+- fresh inserted or changed methods are marked bleu (only if version control is used)
+- new menu in configuration browser (load and run)
+- new start option loadconfigmapdb
+- atkdebugger are not supported any more
+- bug in reordering components in db configuration maps are fixed
+- some small bugs are fixed
+# Version 0.79
+* Wed Aug 31 2005 Artur Trzewik 
+- XOTclIDE as kit can be used as library. source xotclide.kit; package requiere XOTclIDE; IDEStarter startIDEFromApp
+- Statebuttons are changed to multiple buttons, so it looks like notetab
+- componenent browser supports now splited display that alow view of source and comment in separate windows
+- debugger support syntax hightlighting and all tcl code edition. also saving of procs are possible now
+- bug in debugger fixed (not destroying debugger instances)
+- method categories view list display amount of methods right after name
+- thanks to Brian Theado for ideas of improvements
+# Version 0.77
+* Sat Jul 23 2005 Artur Trzewik
+- support of Metakit as version control persistence medium
+- changes append short-cut to Ctrl-p (because Ctrl-a is used in Windows for 'select all')
+- adding paneled windows to edition chooeser and edition viewer
+- method changed in current session are marked blue (only it version control is used)
+- bug in syntax parser (checking proc namespace) fixed
+- replace all dialog have option cancel for aborting operation
+# Version 0.76
+* Wed May 04 2005 Artur Trzewik
+- bug in package loader fixed (BWidget could not be loaded)
+- syntax checker recognize variable and lset commands
+- syntax completion recognize variable and lset command
+- fixed many bugs about tcl proc handling and namespace
+- debugging of tcl procs
+- searching in tcl procs
+- importing tcl procs
+- procs groups with namespace
+- importing of tcl procs from tcl interpreter
+- wizzard migration tcl procs to XOTcl method extended by method call conversation
+# Version 0.75
+* Sat Mar 12 2005 Artur Trzewik
+- TclParser and Code Completion can handle also not full qualifized names (procs and xotcl objects)
+- bug in computing changes script fixed
+- improved package loading wizard (can show also package version, kind and location), adding new package location (of pkgIndex.tcl file)
+- mixin handling improved for 1.3 XOTcl version
+- requires XOTcl1.3 now
+- requires Tcl8.4 now
+- fixed code indention in many packages
+- new plugin XOTcl update helper. Helps to compute differences inter actual interpreter state and XOTcl code. All Differences can be accepted separatelly.
+# Version 0.74
+* Sat Feb 19 2005 Artur Trzewik, Fabrice Pardo
+- all components contens are savad in same order. now xotclide can be used with file oriented versioning systems (cvs, svn) - Fabrice Pardo
+- change all string comparision from ==,!= to eq,ne operators
+- new lock function for variable view in object browser (multi-mode) - Fabire Pardo (modified by AT)
+- fixed the menu enablement in object browser.
+# Version 0.73
+* Wed Feb 09 2005 Artur Trzewik
+- changing list selection mode from single to browse (patch by Fabrice Pardo)
+- better handling of definining new procs and list refresh
+- fixed double click in debugger for viewing object instpector
+- components and object version control have new function reload edition, that is useful in multi user enviroment
+- proload components in Starter fixed for acception file packages
+- some menu names changed for better understanding (patch by Fabrice Pardo)  
+- plugin Script Editor fixed
+# Version 0.72
+* Sun Jan 09 2005 Artur Trzewik
+- class wizard define class in :: namespace not in ::IDE (workaround define name as ::example)
+- bugs in genarating start skrip for tclkit deployer removed
+- refactoring of tclkit deployer and file deployer
+- persistance module can handle formted timestamp from mysqltcl in verison 4.1
+- bug in sql-connection dialog handling of default for file fields fixed
+# Version 0.71
+* Thu Nov 09 2004 Artur Trzewik
+- bugs in class view in heritage mode fixed
+- choose list dialog supports fast regexp selection of items
+- all list views select first item corresponding to pressed key
+- bug by insert new method than comment mode fixed
+* Thu Nov 09 2004 Michael Heca
+- bug in saving preferences on windows fixed
+# Version 0.70
+* Sat Oct 23 2004 Artur Trzewik
+- addapting internal object creation for XOTcl 1.3.2
+- addapting proc handling for XOTcl 1.3.2
+- preferences (user setting) gui for fonts (list, edior) and background colors
+- paned window for 'Configuration Map Browser'
+- fixed tcl parser for special expresion like "ewew [command "string"]"
+- support for non positional arguments (new in XOTcl 1.3)
+- help menu with links auf external WWW resources
+- new function "reset slave interpreter" for plug-in script editor
+- component browser display currently selected component name in the window title
+- bug in method tracker fixed
+- invoking instprocs from object browser improved (handling of default arguments)
+* Sun Sep 05 2004 Michael Hec
+- Added Functionality (Hierachy and Childre Browser) in Hierarchy Browser
+- better focus and key handling in Component Browser
+- impoved searching regular expression
+- fixed selection by find dialog on window platform
+- rigth messages in versions browser on action click
+- fixed preferances handling on window platform
+- added function (destroy widget) in Tk Win Inspector
+- added function "search references" in class view
+- default setting in category view on "_all_categories"
+- fixed Return keypres in dialog
+- fixed heritage list
+- fixed recursive component load from db
+- improxe if/else syntax checking
+- new try {body} finally {body} syntax
+- focus editor on new method
+- invoke menu in spawn proc edit
+- syntax checker with full keyboard control, update call for better multitasking
+# Version 0.61
+* Fri Jul 09 2004 Artur Trzewik
+- New Plug-In I18N Helper. For produce msg cataglogs
+- Bug by after importing sources (datatime functions) fixed
+- upgrated sql interfaces
+- class that have subclasses can not be deleted
+- improved workspace (open and save functions like in common editor)
+- bug by syntax check view (destroying windows) fixed
+- supports for MS SQL Server as version control database
+- supports Oracle as version control database (per oratcl)
+# Verison 0.60
+* Fri Mar 26 2004 Artur Trzewik
+- support of ODBC (MS Access Driver), version control in .mdb file
+- imporved usability of Deploymend as Tclkit (directly from Configuration Browser)
+- Script-Editor Plug-In can run scripts in slave interpreter
+- standard debugger fixed to support also normal tcl procs
+- variable watch brower
+- variable access tracker (invoke debugger on variable read or write access)
+- bugfix in ClassView (persistence check)
+- bugfix in double click in Class Definition Wizzard
+- bugfix in TkInspector Plugin - ignore deleted windows
+- can retrieve user name also from Windows per env(USERNAME)
+- in function "load package" already loaded packages are not more offered
+- documentation update
+# Version 0.59
+* Fri Mar 05 2004 Artur Trzewik
+- new plugin VisualRegexpr (reimplementation of L. Riesterer VisualRegexpr in XOTcl)
+- Proc to Method wizzard that help convert Tcl proc code to xotcl instance methods
+- open and save diologs do not change working dictionary
+- list choose dialog accept also double-click for confirm the chose.
+- also ErrorStackBrowser, MethodListBrowser and HeritageBrowser can show commnets and method version information in status bar
+- Auto Indent - command has shortcut Control-T
+- some correction in Tcl Parser
+- class selector trim classnames from leading ::
+# Version 0.58
+* Mon Jan 29 2004 Artur Trzewik
+- new plugin SQLBrowser
+- new plugin FileBrowser that can mount zip and mk4 (starkit) file systems
+- version state (edition,versioned,not in version system) are differently color displayed
+- better code completion (also global and upvar defined variables)
+- in list view double click will be interpreted as action
+- DB connection dialog is part of xdobry::sql component
+- bug in move object/class to component removed
+# Version 0.57
+* Thu Jan 06 2004 Artur Trzewik
+- new plugin Tk Inspector. view and set tk widgets configuraton and widget serialization
+- standard font by all text widgets Curier -14
+- refactoring in IDE::IDialogList
+- safe dialogs also this standard fiel extensions
+- editional functions by tcl mode editor
+- auto ident, add ident and minus ident
+- comment and uncomment region
+- command completion also for build in object commands
+- in dialog for vesioning commponents also procedures groups names are displayed
+- sqlite open dialog with file chooser dialog
+- syntax checking by lsearch and lsort upgradated
+- class and object move function also respect versioning components
+- view history function (method->next and previous) respect all structure views
+- prepare for XOTcl 1.1.2 changes names of subobjects to not hide methods
+- refactoring by TclParser. Commands are checked before procedures
+# Version 0.56
+* Fri Dec 12 2003 Artur Trzewik
+- small bug in configuration browser function new edition that could cause not full copy of components was removed
+- resizing in dialogs corrected
+- work around by windows modeless dialogs malfunction
+- refactoring and improvements by selecting items in IDE::ListView
+- bug by importing components from files with whitespaces in the name fixed
+- windows title in ErrorReporter will be set
+- also horizontal paned windows im component browser
+- success message in deploy browser corrected (right path name)
+- Heritage- and Childrenbrowser also with panedwindows
+- invoke proc function in method view will be enabled only by tcl procs and class procs
+# Version 0.55
+* Mon Nov 24 2003 Artur Trzewik
+- (bug in xotclide startup) extended debugger can be loaded from version control or as package
+- bug in script editor by loading scrips removed 
+# Version 0.54
+* Mon Nov 17 2003 Artur Trzewik
+- new plugin ScriptEditor. That enable XOTcl mode and syntax check for small tcl scripts
+- after viewing syntax check errors all text-hightlighting are removed
+- no warning message by scaning @File meta data
+- by connection VC Database or Installing only Interfaces are propened that have Tcl-API installed
+- refactoring of tclkit variant starting scripts
+- error in Tcl-Parser removed (by calling XOTcl objects from pure Tcl procedures)
+- Find Class function (menu ComponentBrowser->Component->Find Class) can be used also for searching Objects
+- Configuration Browser (bug fixed). By invoking deployment wizzard the domain stuctures are fist updated
+- Bug in global variable browser removed. Problem in invoking hiding info method from namespace
+- Method Browser and Global Variable Browser support paned frames
+- Invoking object methods and tcl procs per GUI handle correct the parameters with defaults
+# Version 0.53
+* Sat Oct 18 2003 Artur Trzewik
+- fixed many bugs in version contol handling of tcl procedures (bug reported by Daniel Zlobec)
+- fixed bug in new class wizard when mode 'Tcl Procs'
+# Version 0.52
+* Sun Oct 12 2003 Artur Trzewik
+- can handle also procs and instprocs names as list "proc {my proc} {} {puts He}"
+- file out editor function remember saved file name
+- bug in load persistent component on unpersisten component removed
+- bug in syntax checking tcl proc removed (thanks Michael Schlenker for bug report)
+# Version 0.51
+* Sun Sep 20 2003 Artur Trzewik
+- new deployment tool with more deployment options
+- deployement plugin for generating tclkit and starpack
+- new plugin tcl wiki reaper that can load tcl source from http:://www.mini.net/tcl
+- new plug ins architecture with plug ins configuration file pluginslist.txt
+- loaded components are also registered as packages to avoid errors by mixed loading from file system and VC
+- changes browser can produce for components changes script
+- bug in initializing comments by loading from DB for preloaded packages removed
+- bug in Tcl Parser by resolvin proc names in namespaces removed
+- print it and substitute it editor functions select evalution result after processing
+- file in and file out editor functions remember file name
+# Version 0.50
+* Sun Aug 31 2003 Artur Trzewik
+- new overworked documentation (user guide) available also as PDF
+- documentation are no more included into source file
+- the editor Tcl evaluation "Print it" select the result after evaluation
+- use text undo function in Tk8.4 text widget (Control-Z)
+- procedures defined in namespace eval statement can be imported
+- code completion act also with <Ctrl-Space> Key (not only <Tab>)
+- in Tk8.4 Component Browser have spin-box
+- also Tcl Procedures can be invoked from Component Browser
+# Version 0.44
+* Fri Aug 01 2003 Artur Trzewik
+- new menu item Component->Low Level Functions->Change Working Dir
+- Save Component Wizard (Component->Save Components) have new option "create pkgIndex.tcl"
+- Configuration Map Browser can save components and create pkgIndex.tcl
+# Version 0.43
+* Sun Jun 15 2003 Artur Trzewik
+- new start option -withdebugger to load extended debugger at start
+- all input dialogs supports accelerators (Return, Escape, Alt-o, Alt-c)
+- Accelerator Alt-u for changing between source and comment mode
+- accelerators for most used function
+- find/replace dialog supports accelerators
+- breakpoints will be shown in all code windows (object browser and method browser)
+- if method-browser has only one method it will be selected at once.
+# Version 0.42
+* Wed Apr 09 2003 Artur Trzewik
+- new global variables inspector
+- wizard for importing procs from interpreter into components
+- coverage analysis browser (check method calls for specified class)
+- bug in redefinition of procs group namespace script removed
+- some inconsistent functions in find/replace dialog removed
+- bug in moving procs group into version-managed components removed
+- bug in enabling/disabling menu version create edition removed
+- deleting class function with additional "are you sure" dialog
+- wizard overwrite method template corrected
+- false enabling in inspect parent function (object browser) corrected
+- method filtering in object inspector corrected (new check box only procs)
+# Version 0.41
+* Sun Mar 02 2003 Artur Trzewik
+- sqlite adapter added (thanks to Oleg Oleg Oleinick)
+- option -configmap are supported by all XOTclIDE modes
+- refresh method menu in object inspector
+- bug by rename components removed
+- create object wizard added
+- IDEExtendedDebugger is loadable without need to load atkdebugger. Important for VC Installer
+# Version 0.40
+* Wed Feb 26 2003 Artur Trzewik
+- Bug Save All by ignore IDE components removed
+- Bug after importing new component into VC removed
+# Version 0.39
+* Sun Feb 16 2003 Artur Trzewik
+- bug in Array Browser was removed
+- bug in available classes browser removed (case the class are not loaded)
+- the debugger was changed
+- support for atkdebugger
+# Version 0.36
+* Sun Dec 29 2002 Artur Trzewik
+- support for mysqltcl2.11
+- using pg_execute in postgres wrapper
+- popdown menus (common model for all windows)
+- menus dynamic enable-mend (common modell)
+- improvement for code completion (variables)
+- more comments in code
+- bug in version chooser (browse changes) was removed
+- adaption in START.tcl for using IDEStarter
+- improvments in syntax checker (arrays)
+- code refactoring
+- unit tests for configuration maps
+# Version 0.35
+* Sun Nov 24 2002 Artur Trzewik
+- code completion
+- configuration map can be stored in version system
+- new configuration map browser
+- many bug fixes and small improvements
+# Version 0.32
+* Mon Aug 01 2002 Artur Trzewik
+- static parsed syntax hight-lighting
+- syntax check by editing
+- syntax checker tool
+# Version 0.31
+* Thu Jun 27 2002 Artur Trzewik
+- syntax hight-lighting for comments and quotes
+- HTML doc generator
+- Tcl comments scanner
+- odbc and postgres support
+- better install procedures
+- new lunching system from db
+- better windows support
+# Version 0.30
+* Fri Apr 12 2002 Artur Trzewik
+- support for Tcl procs (importing, generating, managing)
+- unit test cover almost whole application
+- show of versions trees (components, classes, methods)
+- component save wizard (flexible source generation)
+- many small improvements
+# Version 0.25
+* Mon Feb 25 2002 Artur Trzewik
+- changes for xotcl 0.93
+- MS Windows Support
+# Version 0.24
+* Sun Dec 2 2001 Artur Trzewik
+- Tcl mode editing 
+  automatic indent with braces search
+  selecting braces areas by double-click directly after open brace
+- using XOTclIDE without mouse support (tabulator)
+- mixin wizard by object inspector
+- show all available methods in object inspector
+- bug removed by class tracker (tracking classes)
+# Version 0.23
+* Wed Nov 14 2001 Artur Trzewik
+- class tracker updated for xotcl 0.9
+- component rename function
+- tracking of objects (method Object>trackOn)
+- object browser extended
+- automatic importing of XOTcl project from source files
+# Version 0.22
+* Sun Nov 4 2001 Artur Trzewik
+- support for documentation in XOTclIDE
+- support for @ token (load and save)
+- install tool for Version Control System
+- database connection parameters in preference file .xotclide
+# Version 0.21
+* Sun Oct 21 2001 Artur Trzewik
+- Porting to 0.9 XOTcl
+# Version 0.20
+* Fri Oct 12 2001 Artur Trzewik
+- Error Reporter (allow to generate error files to send as bug report)
+- Full featured Configuration Browser
+- deep error research
+# Version 0.19
+* Fri Aug 31 2001 Artur Trzewik
+- invoke extras like (Test Framework, SqlDebuger) per GUI
+- search for fresh inserted or modified methods
+- edition viewer for components and classes directly 
+  from version control database
+- Tracker Browser (To show calling methods flow)
+- many other small things
+# Version 0.18
+* Fri Aug 3 2001 Artur Trzewik
+- Test framework for automatic unit tests
+- some test classes for IDE 
+- Changes Browser (to see differences among versions)
+- wizard dialog for new class creation or redefinition
+- next and prev function (like html-browser) for browsing methods
+- view method under cursor (Control-m)
+- spawned windows
+# Version 0.17
+* Tue Jul 4 2001 Artur Trzewik
+- simple debugging with debug browser and error stack browser
+- version control system save information about user changes
+- some small new GUI functions
+# Version 0.16
+* Fri Jun 22 2001 Artur Trzewik
+- extensive refactoring
+- new version system schema 
+  (old systems must be converted by update.tcl script)
+- find/replace dialog
+- search for text, implementors and senders in components or all system
+- better user interfaces
+
+
+
+
+
