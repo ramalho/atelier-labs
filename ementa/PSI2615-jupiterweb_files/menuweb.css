@@ -1,0 +1,270 @@
+
+/* ----------------------------- Menu Vertical ----------------------------- */
+ul.pureCssMenu ul{display:none}
+ul.pureCssMenu li:hover>ul{display:block}
+ul.pureCssMenu ul{position: absolute;left:98%;top:-1px;}
+ul.pureCssMenu ul ul{position: absolute;left:98%;top:-2px;}
+ul.pureCssMenu,ul.pureCssMenu ul {
+	margin:0px;
+	list-style:none;
+	padding:1px 1px 1px 1px;
+	background-color:#FFFFFF;
+	background-repeat:repeat;
+	border-color: #CCCCCC;
+	border-width:1px;
+	border-style:solid;
+	width:166px;
+	z-index:10;
+}
+ul.pureCssMenu table {border-collapse:collapse}
+ul.pureCssMenu {
+	display:block;
+	zoom:1;
+	width:166px;
+	float: left;
+}
+ul.pureCssMenu ul{
+	width:166px;
+}
+ul.pureCssMenu li{
+	display:block;
+	margin:1px 0px 0px 1px;
+}
+ul.pureCssMenu a:active, ul.pureCssMenu a:focus {
+  outline-style:none;
+}
+ul.pureCssMenu a, ul.pureCssMenu li.dis a:hover, ul.pureCssMenu li.sep a:hover {
+	display:block;
+	vertical-align:middle;
+	zoom:1;
+	background-color:#FFFFFF;
+	border-width:0px;
+	border-color:#E4E1DE;
+	border-style:solid;
+	text-align:left;
+	text-decoration:none;
+	padding:4px;	
+	font:normal 10px Verdana;
+	color: #000000;
+}
+ul.pureCssMenu span{
+	overflow:hidden;
+}
+ul.pureCssMenu ul li {
+	float:none;
+}
+ul.pureCssMenu ul a {
+	text-align:left;
+	white-space:normal;
+}
+ul.pureCssMenu li.sep{
+	text-align:left;
+	padding:0px;
+	line-height:0;
+}
+ul.pureCssMenu li.sep span{
+	float:none;	
+	padding-right:0;
+	width:100%;
+	height:3;
+	display:inline-block;
+	background-color:#EEEEEE #777777 #666666 #C9C9C9;	background-image:none;
+}
+ul.pureCssMenu li:hover{
+	position:relative;
+}
+ul.pureCssMenu li:hover>a{
+	background-color:#D6D6D6;
+	border-color:#7D7D7D;
+	border-style:solid;
+	font:normal 10px Verdana;
+	color: #000000;
+	text-decoration:none;
+}
+ul.pureCssMenu li a:hover{
+	position:relative;
+	background-color:#D6D6D6;
+	border-width:0px;
+	border-color:#7D7D7D;
+	border-style:solid;
+	font:normal 10px Verdana;
+	color:#000000;
+	text-decoration:none;	
+	cursor:pointer;cursor:hand;
+}
+ul.pureCssMenu li.dis a {
+	color: #AAAAAA !important;
+}
+ul.pureCssMenu img {
+  border:none;float:left;margin-right:4px;width:24px;height:24px;
+}
+ul.pureCssMenu ul img {
+	width:30px; height:15px;
+}
+ul.pureCssMenu img.over{display:none}
+ul.pureCssMenu li.dis a:hover img.over{display:none !important}
+ul.pureCssMenu li.dis a:hover img.def {display:inline !important}
+ul.pureCssMenu li:hover > a img.def  {display:none}
+ul.pureCssMenu li:hover > a img.over {display:inline}
+ul.pureCssMenu a:hover img.over,ul.pureCssMenu a:hover ul img.def,ul.pureCssMenu a:hover a:hover ul img.def,ul.pureCssMenu a:hover a:hover a:hover ul img.def,ul.pureCssMenu a:hover a:hover img.over,ul.pureCssMenu a:hover a:hover a:hover img.over,ul.pureCssMenu a:hover a:hover a:hover a:hover img.over{display:inline}
+ul.pureCssMenu a:hover img.def,ul.pureCssMenu a:hover ul img.over,ul.pureCssMenu a:hover a:hover ul img.over,ul.pureCssMenu a:hover a:hover a:hover ul img.over,ul.pureCssMenu a:hover a:hover img.def,ul.pureCssMenu a:hover a:hover a:hover img.def,ul.pureCssMenu a:hover a:hover a:hover a:hover img.def{display:none}
+ul.pureCssMenu a:hover ul,ul.pureCssMenu a:hover a:hover ul,ul.pureCssMenu a:hover a:hover a:hover ul{display:block}
+ul.pureCssMenu a:hover ul ul,ul.pureCssMenu a:hover a:hover ul ul{display:none}
+ul.pureCssMenu span{
+	display:block;
+	background-image:url(../images/arrow_sub1.gif);
+	background-position:right center;
+	background-repeat: no-repeat;
+  padding-right:12px;
+}
+ul.pureCssMenu ul span,ul.pureCssMenu a:hover table span{background-image:url(../images/arrow_sub1.gif)}
+
+/* Adicional */
+ul.pureCssMenu li.pureCssMenuHeader{
+	font-family: verdana;
+	font-size: 10px;
+	font-weight: bold;
+	color: white;
+	background-color: #cccccc;
+	width: 94%;
+	padding: 4px;
+}
+ul.pureCssMenu li.pureCssMenuNormal{
+	font-family: verdana;
+	font-size: 10px;
+	font-weight: normal;
+	color: #000000;
+	padding: 2px;
+}
+
+
+/* ----------------------------- Menu Horizontal ----------------------------- */
+
+ul.pureCssMenuH ul{display:none}
+ul.pureCssMenuH li:hover>ul{display:block}
+ul.pureCssMenuH ul{position: absolute;left:5px;top:110%;}
+ul.pureCssMenuH ul ul{position: absolute;left:98%;top:-2px;}
+
+ul.pureCssMenuH,ul.pureCssMenuH ul{
+	margin:-3px 0px 10px -3px;
+	list-style:none;
+	padding:0px 2px 2px 0px;
+	background-color:#FFFFFF;
+	background-repeat:repeat;
+	border-color: #CCCCCC;
+	border-width:1px;
+	border-style:solid;
+	width:100%;
+	z-index:10;
+}
+ul.pureCssMenuH table {border-collapse:collapse}
+ul.pureCssMenuH {
+	display:block;
+	zoom:1;
+	float: left;
+}
+ul.pureCssMenuH ul{
+	width:160px;
+}
+ul.pureCssMenuH li{
+	display:block;
+	margin:2px 0px 0px 2px;
+}
+ul.pureCssMenuH a:active, ul.pureCssMenuH a:focus {
+  outline-style:none;
+}
+ul.pureCssMenuH a, ul.pureCssMenuH li.dis a:hover, ul.pureCssMenuH li.sep a:hover{
+	display:block;
+	vertical-align:middle;
+	background-color:#FFFFFF;
+	border-width:0px;
+	border-color:#E4E1DE;
+	border-style:solid;
+	text-align:left;
+	text-decoration:none;
+	padding-top:2px;
+	padding-bottom:2px;
+	padding-left:6px;
+	padding-right:6px;
+	font:normal 10px Verdana;
+	color: olive;
+}
+ul.pureCssMenuH span{
+	overflow:hidden;
+}
+ul.pureCssMenuH li {
+	float:left;
+}
+ul.pureCssMenuH ul li {
+	float:none;
+}
+ul.pureCssMenuH ul a {
+	text-align:left;
+	white-space:normal;
+}
+ul.pureCssMenuH li.sep{
+	text-align:left;
+	padding:0px;
+	line-height:0;
+}
+ul.pureCssMenuH li.sep span{
+	float:none;	
+	padding-right:0;
+	width:5;
+	height:16;
+	display:inline-block;
+	background-color:#AAAAAA;	
+	background-image:none;
+}
+ul.pureCssMenuH ul li.sep span{
+	width:80%;
+	height:3;
+}
+ul.pureCssMenuH li:hover{
+	position:relative;
+}
+ul.pureCssMenuH li:hover>a{
+	background-color:#D6D6D6;
+	border-color:#7D7D7D;
+	border-style:solid;
+	font:normal 10px Verdana;
+	color: #000000;
+	text-decoration:none;
+}
+ul.pureCssMenuH li a:hover{
+	position:relative;
+	background-color:#D6D6D6;
+	border-width:0px;
+	border-color:#7D7D7D;
+	border-style:solid;
+	font:normal 10px Verdana;
+	color:#000000;
+	text-decoration:none;	
+	cursor:pointer;cursor:hand;
+}
+ul.pureCssMenuH li.dis a {
+	color: #AAAAAA !important;
+}
+ul.pureCssMenuH img {
+  border:none;float:left;margin-right:4px;width:16px;height:16px;
+}
+ul.pureCssMenuH ul img {
+	width:16px; height:15px;
+}
+
+ul.pureCssMenuH img.over{display:none}
+ul.pureCssMenuH li.dis a:hover img.over{display:none !important}
+ul.pureCssMenuH li.dis a:hover img.def {display:inline !important}
+ul.pureCssMenuH li:hover > a img.def  {display:none}
+ul.pureCssMenuH li:hover > a img.over {display:inline}
+ul.pureCssMenuH a:hover img.over,ul.pureCssMenu a:hover ul img.def,ul.pureCssMenu a:hover a:hover ul img.def,ul.pureCssMenu a:hover a:hover a:hover ul img.def,ul.pureCssMenu a:hover a:hover img.over,ul.pureCssMenu a:hover a:hover a:hover img.over,ul.pureCssMenu a:hover a:hover a:hover a:hover img.over{display:inline}
+ul.pureCssMenuH a:hover img.def,ul.pureCssMenu a:hover ul img.over,ul.pureCssMenu a:hover a:hover ul img.over,ul.pureCssMenu a:hover a:hover a:hover ul img.over,ul.pureCssMenu a:hover a:hover img.def,ul.pureCssMenu a:hover a:hover a:hover img.def,ul.pureCssMenu a:hover a:hover a:hover a:hover img.def{display:none}
+ul.pureCssMenuH a:hover ul,ul.pureCssMenu a:hover a:hover ul,ul.pureCssMenu a:hover a:hover a:hover ul{display:block}
+ul.pureCssMenuH a:hover ul ul,ul.pureCssMenu a:hover a:hover ul ul{display:none}
+ul.pureCssMenuH span{
+	display:block;
+	background-image:url(../images/arrow_sub1.gif);
+	background-position:right center;
+	background-repeat: no-repeat;
+  padding-right:11px;
+}

@@ -1,0 +1,8 @@
+.menulist li:hover>ul {
+ display: block;
+}
+
+/* Sort of works ;) */
+.menulist a:focus+ul {
+ display: block;
+}

@@ -1,0 +1,898 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html class=" gecko mac js"><head>
+  <title>Jupiterweb</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+  <meta http-equiv="CACHE-CONTROL" content="NO-CACHE">
+  <meta http-equiv="Expires" content="-1">
+  <link href="PSI2615-jupiterweb_files/home.css" type="text/css" rel="stylesheet">
+	<link href="PSI2615-jupiterweb_files/menuweb.css" type="text/css" rel="stylesheet">
+	
+	
+
+
+
+
+
+<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/home.css">	
+<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/jquery-ui-1.css">
+<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/validationEngine.css">
+<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/ui.html">
+<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/jquery_005.html">
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery-1.js"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery-ui-1.js"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery.js"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery-blockUI.js"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_003.js"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_002.js" charset="utf-8"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_004.js" charset="utf-8"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/grid.html"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery.html"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_003.html"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_004.html"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/engine.js"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/util.js"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/usp-util.html"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/usp-exception-dwr.html"></script>
+	<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_002.html"></script>	
+	<script src="PSI2615-jupiterweb_files/cssselector.js" type="text/javascript"></script>	
+	
+	<script type="text/javascript" src="PSI2615-jupiterweb_files/comum_002.html"></script>	
+	<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/comum.html">
+	<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/menuweb.css">
+	
+<style>
+	#layout_principal {
+    width: 100%;
+	}
+		
+	#layout_cabecalho {
+
+	}
+		
+	#layout_menu {
+		width: 170px;
+		float: left;
+		padding-top: 10px;
+	}
+	
+	#layout_conteudo {
+		padding-left: 181px;
+		padding-top: 10px;
+	}	
+</style></head>
+
+	<!--[if IE]>
+	<style>		
+		#layout_conteudo {
+			padding-left: 10px;
+			padding-right: 2px;
+			padding-top: 10px;	
+			padding-bottom: 20px;	
+			overflow:auto;
+		}	
+	</style>
+	<![endif]-->	
+<body>
+
+<div id="layout_principal">
+	<div id="layout_cabecalho">
+		
+<style>
+	a.cabecalho_sair:active  {font-family:verdana; font-weight:bold; color:#FFFFFF; text-decoration:none;}
+	a.cabecalho_sair:link    {font-family:verdana; font-weight:bold; color:#FFFFFF; text-decoration:none;}
+	a.cabecalho_sair:visited {font-family:verdana; font-weight:bold; color:#FFFFFF; text-decoration:none;}
+	a.cabecalho_sair:hover   {font-family:verdana; font-weight:bold; color:#FFFFFF; text-decoration:underline;}
+
+	td.font_cabecalho1 {
+		font:bold 26px Tahoma;
+		color: #FFFFFF;
+	}
+	td.font_cabecalho2 {
+		font:bold 10px Arial;
+		color: #FFFFFF;
+	}		
+	td.font_cabecalho3 {
+		font:normal 9px Verdana;
+		color: #FFFFFF;
+	}
+</style>
+
+<table background="PSI2615-jupiterweb_files/barra_cores.jpg" border="0" cellpadding="0" cellspacing="0" height="64" width="100%">
+	<tbody><tr>
+		<td rowspan="3" align="center" width="200">
+			<a href="http://www.usp.br/" target="_blank"><img src="PSI2615-jupiterweb_files/logoUSP.gif" alt="" border="0" height="49" width="122"></a>
+		</td>
+		<td class="font_cabecalho1" height="40">Universidade de São Paulo</td>
+	</tr>
+	<tr>
+		<td class="font_cabecalho2" height="10" valign="middle">BRASIL</td>
+	</tr>
+	<tr>
+		<td class="font_cabecalho3" align="right" nowrap="nowrap" valign="top">			
+			
+		</td>
+	</tr>
+</tbody></table>           
+	</div>
+
+	<div id="layout_menu">				
+		
+
+
+
+<!-- FreeStyle Menu v1.0RC by Angus Turnbull http://www.twinhelix.com -->
+ <script type="text/javascript" src="PSI2615-jupiterweb_files/fsmenu.js"></script>
+
+ <!-- Demo CSS layouts for the list menu. Pick your favourite one and customise! -->
+ <!-- Remove all but one and change "alternate stylesheet" to "stylesheet" to enable -->
+ <link rel="stylesheet" type="text/css" id="listmenu-v" href="PSI2615-jupiterweb_files/listmenu_v.css" title="Vertical 'Earth'">
+
+ <!-- Fallback CSS menu file allows list menu operation when JS is disabled. -->
+ <!-- This is automatically disabled via its ID when the script kicks in. -->
+ <link rel="alternate stylesheet" type="text/css" id="fsmenu-fallback" href="PSI2615-jupiterweb_files/listmenu_fallback.css">
+  
+
+<script type="text/javascript">
+//<![CDATA[
+
+var arrow = null;
+if (document.createElement && document.documentElement)
+{
+ //arrow = document.createElement('span');
+ //arrow.appendChild(document.createTextNode('>'));
+ // Feel free to replace the above two lines with these for a small arrow image...
+ arrow = document.createElement('img');
+ arrow.src = 'images/arrow_sub1.gif';
+ arrow.style.borderWidth = '0';
+ arrow.className = 'subind';
+}
+
+
+	// Here's a menu object to control the above list of menu data:
+	var listMenu = new FSMenu('listMenu', true, 'display', 'block', 'none');
+	listMenu.hideDelay = 800;
+	//listMenu.showDelay = 0;
+	//listMenu.switchDelay = 125;
+	//listMenu.cssLitClass = 'highlighted';
+	//listMenu.showOnClick = 0;
+	listMenu.hideOnClick = true;
+	listMenu.animInSpeed = 0.5;
+	listMenu.animOutSpeed = 0.5;
+	listMenu.animations[listMenu.animations.length] = FSMenu.animFade;
+	listMenu.animations[listMenu.animations.length] = FSMenu.animSwipeDown;
+	addReadyEvent(new Function('listMenu.activateMenu("listMenuRoot", arrow)'));
+
+
+
+
+
+	var listMenu3 = new FSMenu('listMenu3', true, 'display', 'block', 'none');
+	listMenu3.hideDelay = 800;
+	listMenu3.hideOnClick = true;
+	listMenu3.animInSpeed = 0.5;
+	listMenu3.animOutSpeed = 0.5;
+	listMenu3.animations[listMenu3.animations.length] = FSMenu.animFade;
+	listMenu3.animations[listMenu3.animations.length] = FSMenu.animSwipeDown;
+	addReadyEvent(new Function('listMenu3.activateMenu("listMenuRoot3", arrow)'));
+
+//]]>
+</script>
+
+<!-- PUBLICO -->
+
+	
+	<ul class="menulist" id="listMenuRoot">
+						
+			
+				<li class="menuHeader">Graduação</li>
+					
+			
+				
+				<li><a href="https://uspdigital.usp.br/jupiterweb/jupAjuda.jsp?codmnu=2209" title="">Ajuda</a></li>
+				
+			
+			
+			
+						
+					
+			
+				
+				<li><a href="https://uspdigital.usp.br/jupiterweb/grdGuiaUSPAcessivel.jsp?codmnu=2210" title="">Guia USP Acessível</a></li>
+				
+			
+			
+			
+						
+					
+			
+				
+				<li><a href="https://uspdigital.usp.br/jupiterweb/grdMatriculainterativa.jsp?codmnu=2211" title="">Matrícula interativa</a></li>
+				
+			
+			
+			
+						
+					
+			
+				
+				<li><a href="https://uspdigital.usp.br/jupiterweb/grdInformacoesAcademicas.jsp?codmnu=2212" title="">Informações Acadêmicas</a></li>
+				
+			
+			
+			
+						
+					
+			
+				
+				<li><a href="https://uspdigital.usp.br/jupiterweb/jupCalendario.jsp?codmnu=2213" title="">Calendário USP</a></li>
+				
+			
+			
+			
+						
+					
+			
+				
+				<li><a href="https://uspdigital.usp.br/jupiterweb/jupDisciplinaBusca?tipo=D&amp;codmnu=2214" title="">Disciplinas</a></li>
+				
+			
+			
+			
+						
+					
+			
+				
+				<li><a href="https://uspdigital.usp.br/jupiterweb/jupDisciplinaBusca?tipo=T&amp;codmnu=2215" title="">Turmas</a></li>
+				
+			
+			
+				
+					</ul>
+					
+												
+			
+			
+		
+	
+	<div style="font-size:7px">&nbsp;</div>
+
+
+
+<!-- NAO AUTENTICADO -->
+				
+	<ul class="menulist" id="listMenuRoot3">
+		<li class="menuHeader">Acesso Restrito</li>
+		<li><a href="https://uspdigital.usp.br/jupiterweb/webLogin.jsp">Entrar</a></li>
+		<li><a href="https://uspdigital.usp.br/jupiterweb/esqueciSenha">Esqueci a Senha</a></li>
+		<li><a href="https://uspdigital.usp.br/jupiterweb/primeiroAcesso">Primeiro Acesso</a></li>
+	</ul>
+	<div style="font-size:7px">&nbsp;</div>
+	
+
+
+<!-- AUTENTICADO -->
+	
+
+	</div>	
+
+	<div id="layout_conteudo">									
+		
+		
+		
+		
+		
+		    		
+		
+			
+		    	
+		
+		    			    	
+			
+
+
+
+<title>Exemplos</title>
+<link rel="stylesheet" href="PSI2615-jupiterweb_files/home.css" type="text/css">
+
+
+<!-- cabecalho
+ -->
+
+	<title></title>
+	<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+	
+
+
+
+
+
+<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/home.css">	
+<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/jquery-ui-1.css">
+<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/validationEngine.css">
+<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/ui.html">
+<link type="text/css" rel="stylesheet" href="PSI2615-jupiterweb_files/jquery_005.html"> 
+
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery-1.js"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery-ui-1.js"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery.js"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery-blockUI.js"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_003.js"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_002.js" charset="utf-8"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_004.js" charset="utf-8"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/grid.html"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery.html"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_003.html"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/jquery_004.html"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/engine.js"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/util.js"></script>
+
+<script type="text/javascript" src="PSI2615-jupiterweb_files/usp-util.html"></script>
+<script type="text/javascript" src="PSI2615-jupiterweb_files/usp-exception-dwr.html"></script> 
+
+<style>
+	a.link_cabecalho:active  {font-family: verdana; font-size: 10px; color: olive; text-decoration: none}
+	a.link_cabecalho:link    {font-family: verdana; font-size: 10px; color: olive; text-decoration: none}
+	a.link_cabecalho:visited {font-family: verdana; font-size: 10px; color: olive; text-decoration: none}
+	a.link_cabecalho:hover   {font-family: verdana; font-size: 10px; color: gray; text-decoration: underline}
+	
+	#my_web_cabecalho{
+		font-family: Verdana, Geneva, Arial, Helvetica, sans-serif;		
+		font-size: 10px;
+		text-align:left;
+		width:90%;
+		border-bottom:solid;
+		border-bottom-width:thin;
+		border-bottom-color:#666666;
+		padding-bottom:4px;
+		margin-bottom: 4px;
+	}
+	
+	#my_web_cabecalho_descricao{
+		font-family: Verdana, Geneva, Arial, Helvetica, sans-serif;		
+		font-size: 10px;
+		padding-bottom:10px;
+	}
+</style>
+
+
+	
+ 
+
+<div id="my_web_cabecalho">
+	Informações da Disciplina
+</div>
+
+	
+
+
+
+
+
+
+	<br>
+ 
+<table cellpadding="0" cellspacing="0" width="100%">
+	<tbody><tr>
+		<td>
+			<!-- operacoes -->
+			
+		</td>
+	</tr>
+	<!-- titulos da pagina -->
+	<tr>
+		<td>
+			
+		</td>
+	</tr>
+	<!-- navegacao -->
+	<tr>
+		<td>
+			
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<form name="form1" method="GET" action="">
+			<table border="0" width="100%">
+				<tbody><tr>
+					<td> 
+						<!-- tabela
+					 	--> 
+
+
+
+
+<script language="Javascript">
+function OpenWindowToPrint() {
+	var mylink;
+	
+	if('default' == 'default'){
+		mylink = document.location.href;
+	} else {
+		mylink = 'default';
+	}
+	
+	if(mylink.indexOf("?") > 0){
+		mylink += "&";
+	} else {
+		mylink += "?";
+	}
+	
+	mylink += "print=true";
+	
+	window.open(mylink , "_blank", "toolbar=no,location=no,directories=no,status=no,menubar=yes,titlebar=yes,scrollbars=yes,resizable=yes");
+}
+</script>
+
+<table align="center" border="0" cellpadding="1" cellspacing="1" width="538">
+  
+  <tbody><tr> 
+    <td align="right">
+	<a href="javascript:OpenWindowToPrint()" class="mail_footer"><img src="PSI2615-jupiterweb_files/print_edit.gif" border="0" height="16" width="16">
+	<font color="#666666" face="Arial, Helvetica, sans-serif" size="1">&nbsp;Preparar para impressão&nbsp;</font>
+	</a>
+	</td>
+  </tr>
+  
+</tbody></table>
+
+ 
+
+<table>
+  <tbody><tr> 
+    <td> 
+      <div align="left"><img src="PSI2615-jupiterweb_files/Logo_usp2.gif"></div>
+    </td>
+    <td valign="bottom"> 
+      <div align="left"><font color="#000000" face="Verdana" size="-1"><span class="txt_verdana_10pt_black"><b> 
+        Júpiter - Sistema de Graduação</b></span></font></div>
+    </td>
+  </tr>
+</tbody></table>
+<br>						
+ 
+ 
+ 
+ 
+   
+
+      <table align="center" bgcolor="#FFFFFF" border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tbody><tr align="LEFT" valign="TOP"> 
+      <td align="CENTER"><b><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="2"><span class="txt_arial_10pt_black"> 
+	    Escola Politécnica</span></font></b></td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+    </tr>
+    <tr align="LEFT" valign="TOP"> 
+      <td align="CENTER"><b><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="2"><span class="txt_arial_10pt_black"> 
+	    Eng de Sistemas Eletrônicos</span></font></b></td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+    </tr>
+
+    <tr align="LEFT" valign="TOP"> 
+      <td align="CENTER"><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="2"><span class="txt_arial_10pt_black"> 
+        <b>Disciplina: PSI2615 - Oficina de Arte e Programação</b></span></font>
+		</td>
+    </tr>
+</tbody></table>
+  <br>
+  <table border="0" cellpadding="3" cellspacing="0">  
+  
+    <tbody><tr align="LEFT" valign="TOP"> 
+      <td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        <b>Créditos Aula:</b></span></font></td>
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"> 
+        4
+		</span></font></td>
+    </tr>
+    <tr align="LEFT" valign="TOP"> 
+      <td><b><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        Créditos Trabalho:</span></font></b></td>
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"> 
+        2</span></font></td>
+    </tr>
+	
+	<tr align="LEFT" valign="TOP"> 
+      <td><b><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        Carga Horária Total: </span></font></b></td>
+       <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"> 
+       		120 h 
+ 			
+			 
+					</span></font></td>
+                      </tr>
+	 
+    <tr> 
+      <td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        <b>Tipo:</b></span></font></td>
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"> 
+	   
+	   
+	   Semestral
+	   
+	   
+	   	   
+	   </span></font></td>
+    </tr>
+	
+	<tr align="LEFT" valign="TOP"> 
+                  <td><b><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+                    Ativação: </span></font></b></td>
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"> 
+        01/01/2005 
+		</span></font></td>
+		
+		  
+		
+		
+		
+		
+		</tr>
+		 
+  </tbody></table>
+  <br>
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tbody><tr align="LEFT" valign="TOP"> 
+      <td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        <b>Objetivos </b></span></font></td>
+    </tr>
+    <tr align="LEFT" valign="TOP"> 
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray">
+ 
+        	- Desenvolver, ao mesmo tempo, a autonomia individual e a 
+expressividade de cada estudante frente ao computador. Desenvolver a 
+integração dos meios eletro-digital-computacionais que suportam o 
+computador, em todos os seus aspectos, como "meio expressivo integral". 
+Desenvolver a capacidade de trabalho coletivo dentro do grupo. <br>- Desenvolver nos estudantes uma sensibilização para as metodologias e dinâmicas de pesquisa. <br>-
+ Fomentar uma cultura de formação de "tecidos de invenção" 
+multidisciplinares e das problemáticas sociais da circulação dos 
+conhecimentos.<br>- Desenvolver, nesse processo, um modo de produção de 
+documentação e de "colocar em cena" os conhecimentos técnicos 
+relacionados a esse meio (que seja acessível a estudantes que não são da
+ engenharia) e que seja útil para programas públicos de inclusão 
+"meta-digital".<br></span></font></td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+    </tr>
+  </tbody></table>
+
+  <table>
+    <tbody><tr align="LEFT" valign="TOP"> 
+      <td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        <b>Docente(s) Responsável(eis)</b></span></font></td>
+    </tr>
+    <tr>
+      <td> 
+        <table border="0">
+	    
+          <tbody><tr> 
+            <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"></span></font></td>
+            <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"> 
+              54251 - Roseli de Deus Lopes</span></font></td>
+          </tr>
+	    		  
+        </tbody></table>
+      </td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+    </tr>
+  </tbody></table>
+  
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tbody><tr align="LEFT" valign="TOP"> 
+      <td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        <b>Programa Resumido</b></span></font></td>
+    </tr>
+    <tr align="LEFT" valign="TOP"> 
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray">
+ 
+        O curso aborda aspectos gerais da interação entre os meios 
+eletro-digitais-computacionais e a arte, e a incidência desses meios 
+sobre a sociedade. Inicia-se com um padrão de questionamento direto da 
+audiência, expondo a cada semana, um ponto técnico particular 
+(estruturas básicas de controle na programação, o que é um oscilador e 
+como fabricar um, como pensar a arquitetura de um microprocessador, qual
+ a diferença entre programação procedural e programação orientada a 
+objetos, como usar um chip de RAM-estática, como usar o modelo de 
+objetos num navegador). As sessões de laboratório enfocam a intersecção 
+entre os conceitos abstratos e as gestualidades  requeridas para  sua 
+aplicação expressiva e funcional. O trabalho dos estudantes se realiza 
+em um modo pesquisa e trabalho em grupo em temas que emergem 
+(documentação e cinema computacional, linguagem de programação aplicada a
+ problemas gráficos,  sistemas de informação,  modelamento 3D, 
+sonorização, eletrônica, sistemas  e processos.</span></font></td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+    </tr>
+    <tr align="LEFT" valign="TOP"> 
+      <td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        <b>Programa</b></span></font></td>
+    </tr>
+    <tr align="LEFT" valign="TOP"> 
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"> 
+        O curso se articula entre uma aula teórica semanal e duas sessões de presença em atividades no laboratório. <br>
+          A aula teórica semanal aborda aspectos gerais da interação 
+entre os meios eletro-digitais-computacionais e a arte, e a incidência 
+desses meios sobre a sociedade.<br>          Em cima disto, iniciando-se
+ com um padrão de questionamento direto da audiência,  expõe-se a cada 
+semana, em detalhe e de uma maneira acessível a todos, um ponto técnico 
+particular: <br>- estruturas básicas de controle na programação, <br>- o que é um oscilador e como fabricá-lo, <br>- como pensar a arquitetura de um microprocessador,<br>- qual a diferença entre programação procedural e programação orientada a objetos,<br>- como usar um chip de RAM-estática,<br>- como usar o modelo de objetos no navegador (DOM).  <br>
+          As sessões de laboratório se realizam em um espaço 
+atelier-laboratório dedicado e aberto para acesso  com a presença 
+cotidiana do professor-pesquisador encarregado (Prof. Dr. Etienne 
+Delacroix).<br>          O enfoque deste laboratório está na intersecção
+ entre os conceitos abstratos e as gestualidades  requeridas para  sua 
+aplicação expressiva e funcional. O trabalho dos estudantes se realiza 
+em um modo pesquisa e trabalho em grupo. A matéria prima do laboratório é
+ uma abundante sucata electro-digital, computadores em desuso, fontes de
+ tensão de PCs, etc.     <br>         O requisito inicial das primeiras 
+duas semanas do curso é a de montar um computador, instalar um sistema 
+operacional, manipular sucata electro-digital, desoldar placas etc... e 
+produzir suas primeiras páginas web por meio da escrita de código 
+(re-introdução à programação - Javascript), produzir rapidamente uma 
+mostra das capacidades, habilidades e conhecimentos pré-existentes nos 
+participantes. Uma ferramenta de trabalho coletivo essencial do curso é o
+ mosaico de fotografias dos participantes, que funciona como portal de 
+acesso aos conhecimentos e processos individuais que se concretizam no 
+sítio web pessoal de cada um. Nesta etapa, a primeira tarefa do 
+professor é a de identificar as capacidades dos participantes e levar 
+seus trabalhos emergentes a atenção de todos. Na próxima etapa, o 
+enfoque está em identificar quem são os que podem assumir uma posição de
+ liderança "natural" e consensual, no desenvolvimento dos vários "pólos"
+ de pesquisa em que se vão articular os trabalhos do semestre. Os pólos 
+emergem em função dos interesses e das capacidades dos participantes. 
+Alguns dos temas propostos são:<br>- documentação e cinema computacional, <br>- linguagem de programação (aplicados a problemas gráficos),  <br>- sistemas de informação (base de dados, etc.), <br>- modelamento 3D,<br>- sonorização, <br>- eletrônica, <br>- sistemas (processos distribuídos, clusters).<br>Não existem projetos individuais, mas projetos que emergem das dinâmicas dos pólos de pesquisa.<br>
+          A característica do curso é que não é elaborado para que todos
+ aprendam as mesmas coisas. O foco é dado em poder medir a curva de 
+aprendizagem e de crescimento de cada um a partir de suas capacidades 
+iniciais. Isso se pode medir pela produção de documentação e de páginas 
+web que todos fazem durante o semestre inteiro, em seus sítios web 
+individuais.<br><br>      Syllabus<br>        Studio of Art and programming <br><br>The
+ course is organized with one weekly  "theory" class meeting for all 
+participants and two sections in the lab, in smaller groups. <br>	The 
+theory class covers broad aspects of the interaction between the 
+electro-digital-computational medium and Art, and the incidence of this 
+media upon society. Following this, and starting from a pattern of 
+direct questioning of the audience, we review every week, in detail and 
+in a manner accessible to all, one technical point in particular. Among 
+these technical points are: Basic control structures in programming, 
+What is an oscillator and how does one fabricate them?   How to think 
+about microprocessor architecture?  What is the difference between 
+procedural programming and object oriented programming?  How can one use
+ a static-ram chip?  How does one use the object model of the navigator 
+(DOM )?  etc....<br>	The laboratory sections will take place in a 
+dedicated studio-lab space, open permanently and with the daily presence
+ of the professor investigator assisted by a team of voluntaries 
+emerging from the group. The accent of this lab is put at the 
+intersection between abstract concepts (programming) and the 
+"gestualities" required for expressivities in their functional 
+application (manipulate machines and components).  The raw materials 
+used in the laboratory come from a large quantity of electro-digital 
+waste, old computers, PC power supplies.<br>              The initial 
+requirement, in the first two weeks of the course, is to assemble and 
+start a computer from parts, to install an operating system, manipulate 
+boards, de-solder components from them, etc... and to produce a first 
+set of web pages by means of writing code with a simple editor 
+(re-introduction to programming, using Javascript) rapidly produces a 
+sampling of the abilities and  pre-existing know-how among the 
+participants. The first task of the teacher is to identify the 
+capacities of the most creative of the participants and to bring their 
+emerging works to the attention of the whole group. In the next step, 
+the accent is put on identifying who are the students who can take a 
+certain degree of  "natural", consensual leadership in the development 
+of the various "poles" of investigation in which the work of the 
+semester will articulate itself.<br></span></font></td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+    </tr>
+    <tr align="LEFT" valign="TOP"> 
+      <td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        <b>Avaliação</b></span></font></td>
+	</tr>
+	 
+     
+  </tbody></table>
+  
+   
+  
+  <table border="0" cellpadding="0" cellspacing="0">
+    
+    <tbody><tr align="LEFT" valign="TOP"> 
+      <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+	  <td> <table border="0">
+	    
+	  <tbody><tr> 
+        
+       <td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        <b>Método</b></span></font></td>
+      </tr>         
+           <tr align="LEFT" valign="TOP"> 
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray">
+ 
+        Cada aluno mantém um conjunto de páginas-web que mostram a 
+progressão de sua aprendizagem durante todas as etapas do curso. Essas 
+páginas são acessíveis continuamente no sítio web do curso. O professor 
+avalia continuamente a progressão da aprendizagem de cada aluno e 
+atribui três notas a avaliações realizadas ao longo do curso a partir do
+ acompanhamento individual da produção de contribuições significativas 
+de documentação e realizações funcionais (seja um programa, uma 
+simulação ou um dispositivo físico). </span></font></td>
+    </tr>
+		<tr>           
+          <td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+                 <b>Critério</b></span></font></td>
+		</tr>
+  
+	  <tr align="LEFT" valign="TOP"> 
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray">
+ 
+        O aluno será considerado aprovado no curso se obtiver como média
+ das três avaliações realizadas ao longo do semestre valor igual ou 
+superior a 5,0 (cinco).</span></font></td>
+      </tr>
+	
+	  <tr>		   
+          <td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+                 <b>Norma de Recuperação</b></span></font></td>
+          </tr> 
+		   <tr align="LEFT" valign="TOP"> 
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"> 
+        Será atribuída nota a um trabalho individual.</span></font></td>
+    </tr>
+	     
+		</tbody></table>		  
+	     </td>
+    </tr>        
+  </tbody></table>
+  
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tbody><tr align="LEFT" valign="TOP"> 
+	</tr><tr>
+      <td>&nbsp;</td>
+    </tr>
+      <tr><td><font color="#000000" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_black"> 
+        <b>Bibliografia</b></span></font></td>
+    </tr>
+	  
+  </tbody></table><table border="0" cellpadding="0" cellspacing="0">    
+    <tbody><tr align="LEFT" valign="TOP"> 
+      <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+	  <td> <table border="0">	               
+        <tbody><tr> 
+            <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"></span></font></td>
+            <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"><span class="txt_arial_8pt_gray"> 
+              Pierre Levy, O que é o virtual? Editora 34, 1a. edição, 1996, 160 pág.<br>Os
+ computadores e as redes digitais estão cada vez mais presentes em nosso
+ cotidiano. Pierre Lévy propõe, neste livro, uma terceira possibilidade-
+ ' enquanto tal, a virtualização não é nem boa, nem má, nem neutra'. 
+Acreditando que a virtualização exprime uma busca pela hominização, o 
+autor começa desmontando aquilo que chama de oposição fácil e enganosa 
+entre real e virtual. A seguir, retrabalhando conceitos de outros 
+pensadores franceses contemporâneos, como Gilles Deleuze e Michel 
+Serres, busca analisar um processo de transformação de um modo de ser 
+num outro. <br><br>Neil Gershenfeld, When things start to think, Ed. Henry Holt, 1a. edição, 224 pág.<br>This
+ remarkable book presents a compelling vision of what the world will be 
+like tomorrow, based on technology in the laboratory today. From a shoe 
+that can exchange data to a supercomputer in a coffee cup, Neil 
+Gershenfeld shows how to dismantle the barrier between the bits of the 
+digital world and the atoms of our physical world in order to bring 
+together the best attributes of both. This is a book for people who want
+ to know what the future is going to look like - and for people who want
+ to know how to create it.<br><br>Lucia Santaella, Culturas e artes do pos-humano, Paulus Edutora, 1a. edição, 2003, 360 pág.  <br>Lucia
+ Santaella apresenta nesta obra o fruto de suas reflexões desde que a 
+passagem da cultura de massas para a cultura das mídias fertilizou 
+gradativamente o terreno sociocultural para o surgimento da cultura 
+digital, ora em curso. A autora tem como objetivo contribuir com 
+sugestões de respostas às questões que estão no centro da atenção 
+daqueles que têm sido movidos pelo desejo da pesquisa sobre os temas do 
+ciberespaço, cibercultura e ciberarte.<br><br>Manuel Castelles, La Era de la Información. Economía , Sociedad y Cultura, Alianza Editorial.<br></span></font></td>
+          </tr>		 	     
+		</tbody></table>		  
+	   </td>
+    </tr>        
+  </tbody></table> 
+  	
+    </td></tr><tr>
+      <td>&nbsp;</td>
+    </tr>
+  </tbody></table>
+   
+  
+  <br>
+  <table>
+    <tbody><tr> 
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"> 
+        <a href="https://uspdigital.usp.br/jupiterweb/listarCursosRequisitos?coddis=PSI2615" class="link_gray">Clique 
+        para consultar os requisitos para PSI2615</a> </font></td>
+    </tr>
+  </tbody></table>
+
+  <br>
+  <table>
+    <tbody><tr> 
+      <td><font color="#666666" face="Verdana, Arial, Helvetica, sans-serif" size="1"> 
+        <a href="https://uspdigital.usp.br/jupiterweb/obterTurma?sgldis=PSI2615" class="link_gray">Clique 
+        para consultar o oferecimento para PSI2615</a> </font></td>
+    </tr>
+  </tbody></table>
+
+						
+						</form></td>
+					</tr>
+					<tr> 
+						<td>
+							<!-- hidden
+							
+							 -->
+						</td>
+					</tr>
+					<tr>
+						<td>
+							<!-- acoes
+							<table width="100%" border="0">
+								<tr>
+									
+								</tr>
+							</table>
+							 -->
+						</td>
+					</tr>
+					<tr> 
+						<td>
+							<!-- submit
+							
+							 -->
+						</td>
+					</tr>
+	    </tbody></table>
+			
+		
+	
+
+
+
+
+
+
+<link rel="stylesheet" href="PSI2615-jupiterweb_files/home.css" type="text/css">
+
+<table align="center" border="0" cellpadding=" 0" cellspacing=" 0" width="100%">
+  
+  <tbody><tr>
+    <td align="center"><font face="Arial, Helvetica, sans-serif" size="1"><hr size="1">
+      <a href="https://uspdigital.usp.br/jupiterweb/creditos.jsp" class="link_olive" target="_self">Créditos</a> 
+      | <a href="https://uspdigital.usp.br/jupiterweb/jupColegiadoEmailLista" class="link_olive">Fale conosco</a><br>
+      © 1999 - 2012 - Departamento de Informática da Codage/USP</font> 
+    </td>
+  </tr>
+</tbody></table>
+
+
+
+		
+					
+		   
+	</div>
+</div>
+
+
+</body></html>
